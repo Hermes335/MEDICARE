@@ -8,11 +8,12 @@
 ### 1. Navbar Redesign (DONE)
 - Rewrote `NavBar.tsx` into 3 components:
   - `Sidebar` — Desktop sidebar (w-64, collapsible to icon-only)
-  - `MobileTopBar` — Mobile top bar with logo + dark mode toggle
+  - `MobileTopBar` — Mobile top bar with logo + dark mode + logout
   - `BottomNav` — Mobile bottom tab bar (4 tabs, 44px touch targets)
 - Updated `App.tsx` with new flex layout (sidebar + main content column)
 - Sidebar is collapsible with `PanelLeftClose`/`PanelLeftOpen` toggle
 - Pure Tailwind CSS, lucide-react icons, dark mode support
+- Logout button added to Sidebar (shows user email) and MobileTopBar
 
 ### 2. Backend Server Setup (DONE)
 - Created `server/` directory with Express.js + TypeScript
@@ -37,7 +38,7 @@
 - `GET/POST/DELETE /api/saved-meds` — protected, per-user
 - All CRUD operations work with SQLite
 
-### 6. Frontend Integration (PARTIALLY DONE)
+### 6. Frontend Integration (DONE)
 - `src/lib/api.ts` — fetch wrapper with auth token handling
 - `src/lib/auth.tsx` — React context (AuthProvider, useAuth hook)
 - `src/app/components/LoginScreen.tsx` — login/register form with tab switcher
@@ -45,35 +46,19 @@
 - `ChatScreen.tsx` — updated to call `POST /api/chat` instead of mock
 - `HistoryScreen.tsx` — updated to fetch from `/api/history` and `/api/saved-meds`
 - Voice input (Mic icon) removed from ChatScreen
+- Logout button added to Sidebar and MobileTopBar
 
-### 7. Pharmacy Screen (PARTIALLY DONE)
-- `PharmacyScreen.tsx` — updated to fetch from `/api/pharmacy/nearby` with geolocation
-- Falls back to sample data if geolocation unavailable
+### 7. Pharmacy Screen (DONE)
+- `PharmacyScreen.tsx` — fetches from `/api/pharmacy/nearby` with geolocation
+- Falls back to showing error message if geolocation unavailable
 - Added loading spinner
+- Removed hardcoded fallback data (API now works)
 
----
-
-## Known Issues
-
-### Pharmacy Endpoint — FIXED ✅
-- **Problem (was):** `GET /api/pharmacy/nearby` returned `{"error":"Failed to fetch pharmacy data"}`
-- **Root cause:** 
-  - Direct `fetch` in tsx runtime was failing (isolation/DNS/network issue)
-  - tsx caching issue prevented code reloads from taking effect
-- **Solution:**
-  - Switched to `undici.fetch` (explicit Node HTTP client instead of global fetch)
-  - Replaced `console.log` with `process.stderr.write` for immediate output
-  - Force-restarted server (`Stop-Process -Name node -Force`) to clear tsx cache
-- **Status:** Now working! Returns real Nominatim pharmacy data, sorted by distance
-
----
-
-## Parts Not Started Yet
-
-1. **Remove hardcoded fallback data** from PharmacyScreen — now that API works, remove fallback logic
-2. **End-to-end testing** — full flow: register → login → chat → pharmacy → history
-3. **Error handling polish** — better error messages in UI for network failures
-4. **Logout button** — no way to log out currently (auth context has `logout()` but no UI trigger in Sidebar/MobileTopBar)
+### 8. Pharmacy Endpoint (DONE)
+- `GET /api/pharmacy/nearby` — uses `undici.fetch` + `child_process` fallback
+- Queries Nominatim OpenStreetMap API for real pharmacy data
+- Calculates distances with haversine formula
+- Returns sorted results within radius
 
 ---
 
@@ -89,8 +74,6 @@ npm run dev           # http://localhost:5173
 
 Server runs on `http://localhost:3001`, Vite proxies `/api` requests to it.
 
-**Note on tsx caching:** After modifying server code, fully restart the server to clear tsx cache. In PowerShell: `Stop-Process -Name node -Force` before `npm run server`.
-
 ---
 
 ## File Structure
@@ -101,7 +84,7 @@ server/
   routes/
     auth.ts             # Register + login
     chat.ts             # Placeholder AI chat
-    pharmacy.ts         # Nominatim pharmacy lookup ✅ WORKING
+    pharmacy.ts         # Nominatim pharmacy lookup
     history.ts          # History CRUD (protected)
     saved-meds.ts       # Saved meds CRUD (protected)
   middleware/
@@ -113,8 +96,16 @@ src/lib/
 
 src/app/components/
   LoginScreen.tsx       # Login/register form
-  NavBar.tsx            # Sidebar + BottomNav + MobileTopBar
-  ChatScreen.tsx        # Updated to use API
-  PharmacyScreen.tsx    # Updated to use API (falls back to sample data)
-  HistoryScreen.tsx     # Updated to use API
+  NavBar.tsx            # Sidebar + BottomNav + MobileTopBar (with logout)
+  ChatScreen.tsx        # Uses /api/chat
+  PharmacyScreen.tsx    # Uses /api/pharmacy/nearby
+  HistoryScreen.tsx     # Uses /api/history and /api/saved-meds
 ```
+
+---
+
+## Remaining / Nice-to-Have
+
+1. **End-to-end testing** — full flow: register → login → chat → pharmacy → history
+2. **Error handling polish** — better error messages in UI for network failures
+3. **Standalone pharmacy script** — `server/standalone-pharmacy.cjs` for child_process fallback
