@@ -1,4 +1,7 @@
 import { Router, Request, Response } from "express";
+import { fetch as undiciFetch } from "undici";
+import { spawn } from "child_process";
+import path from "path";
 
 const router = Router();
 
@@ -38,21 +41,27 @@ router.get("/nearby", async (req: Request, res: Response) => {
       viewbox +
       "&bounded=1";
 
-    console.log("[pharmacy] fetching", nominatimUrl);
+    process.stderr.write(`[pharmacy] fetching ${nominatimUrl}\n`);
 
-    const response = await fetch(nominatimUrl, {
+    const response = await undiciFetch(nominatimUrl, {
       headers: { "User-Agent": "MediGuideApp/1.0" },
     });
 
-    console.log("[pharmacy] response status", response.status);
+    process.stderr.write(`[pharmacy] response status ${response.status}\n`);
 
     if (!response.ok) {
-      console.log("[pharmacy] non-ok response:", response.status, response.statusText);
-      return res.json([]);
+      let bodyText = "";
+      try {
+        bodyText = await response.text();
+      } catch (e: any) {
+        bodyText = `<failed to read response text: ${e?.message || e}>`;
+      }
+      process.stderr.write(`[pharmacy] non-ok response: ${response.status} ${response.statusText} body: ${bodyText}\n`);
+      return res.status(502).json({ error: "Failed to fetch pharmacy data", detail: bodyText });
     }
 
     const pharmacies: any[] = await response.json();
-    console.log("[pharmacy] got", pharmacies.length, "results");
+    process.stderr.write(`[pharmacy] got ${pharmacies.length} results\n`);
 
     const seen = new Set<string>();
     const results = pharmacies
@@ -87,8 +96,82 @@ router.get("/nearby", async (req: Request, res: Response) => {
 
     res.json(results);
   } catch (err: any) {
-    console.error("[pharmacy] CATCH:", err.message, err.stack);
-    res.status(502).json({ error: "Failed to fetch pharmacy data", detail: err.message });
+    process.stderr.write(`[pharmacy] CATCH (fetch): ${err?.message || err}\n`);
+    // Fallback: spawn a plain `node` process to run a standalone script that performs the same fetch.
+    try {
+      const scriptPath = path.join(process.cwd(), "server", "standalone-pharmacy.cjs");
+      process.stderr.write(`[pharmacy] attempting child_process fallback using: ${scriptPath}\n`);
+
+      const child = spawn(process.execPath, [scriptPath, String(lat), String(lng), String(radiusKm)], {
+        cwd: process.cwd(),
+        env: process.env,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      let stdout = "";
+      let stderr = "";
+      const timeout = setTimeout(() => {
+        try {
+          child.kill();
+        } catch (e) {
+          /* ignore */
+        }
+      }, 10_000);
+
+      child.stdout.on("data", (chunk) => (stdout += chunk.toString()));
+      child.stderr.on("data", (chunk) => (stderr += chunk.toString()));
+
+      child.on("close", (code) => {
+        clearTimeout(timeout);
+        if (code === 0 && stdout) {
+          try {
+            const pharmacies = JSON.parse(stdout);
+            process.stderr.write(`[pharmacy] child fallback got ${pharmacies.length} results\n`);
+            const seen = new Set<string>();
+            const results = pharmacies
+              .filter((el: any) => {
+                if (!el.lat || !el.lon) return false;
+                const key = el.lat + "," + el.lon;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              })
+              .map((el: any) => {
+                const elLat = parseFloat(el.lat);
+                const elLng = parseFloat(el.lon);
+                const dist = haversineKm(lat, lng, elLat, elLng);
+                const isPharmacy = el.type === "pharmacy" || el.class === "pharmacy";
+                return {
+                  id: String(el.osm_id),
+                  name: el.name || "Unknown",
+                  type: isPharmacy ? "pharmacy" : "clinic",
+                  distance: formatDistance(dist),
+                  distanceKm: dist,
+                  address: el.display_name || "Address not available",
+                  lat: elLat,
+                  lng: elLng,
+                  phone: "",
+                  isOpen: true,
+                };
+              })
+              .filter((p: any) => p.distanceKm <= radiusKm)
+              .sort((a: any, b: any) => a.distanceKm - b.distanceKm)
+              .slice(0, 20);
+
+            return res.json(results);
+          } catch (parseErr) {
+            process.stderr.write(`[pharmacy] child stdout parse error: ${parseErr} stdout: ${stdout} stderr: ${stderr}\n`);
+            return res.status(502).json({ error: "Failed to fetch pharmacy data", detail: stderr || parseErr.message });
+          }
+        }
+
+        process.stderr.write(`[pharmacy] child process failed code: ${code} stderr: ${stderr}\n`);
+        return res.status(502).json({ error: "Failed to fetch pharmacy data", detail: stderr || "child process failed" });
+      });
+    } catch (childErr: any) {
+      process.stderr.write(`[pharmacy] fallback failed: ${childErr?.message || childErr}\n`);
+      res.status(502).json({ error: "Failed to fetch pharmacy data", detail: childErr?.message || String(childErr) });
+    }
   }
 });
 

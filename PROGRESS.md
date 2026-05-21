@@ -55,32 +55,25 @@
 
 ## Known Issues
 
-### Pharmacy Endpoint — BROKEN
-- **Problem:** `GET /api/pharmacy/nearby` returns `{"error":"Failed to fetch pharmacy data"}`
-- **Root cause:** The Nominatim HTTPS request fails silently inside the Express server process. The same `https.get` / `fetch` code works fine as a standalone script but fails within the Express/tsx runtime.
-- **What was tried:**
-  - Node native `https` module — works standalone, fails in Express
-  - Node native `fetch` API — works standalone, fails in Express
-  - tsx caching issues — server appears to run cached old versions of files
-  - Overpass API — blocked/timeout from this environment
-  - Nominatim API — works from standalone Node scripts, fails from Express
-  - `node --import tsx` instead of `tsx server/index.ts` — same result
-- **Likely cause:** tsx runtime caching or DNS/network isolation within the tsx process
-- **Workaround needed:** Either debug tsx caching, or use a different approach (e.g., child_process exec, or a proxy service)
-
-### Server Restart Issues
-- `pkill -f "tsx server"` doesn't always cleanly kill the process
-- New code changes sometimes don't take effect due to tsx caching
+### Pharmacy Endpoint — FIXED ✅
+- **Problem (was):** `GET /api/pharmacy/nearby` returned `{"error":"Failed to fetch pharmacy data"}`
+- **Root cause:** 
+  - Direct `fetch` in tsx runtime was failing (isolation/DNS/network issue)
+  - tsx caching issue prevented code reloads from taking effect
+- **Solution:**
+  - Switched to `undici.fetch` (explicit Node HTTP client instead of global fetch)
+  - Replaced `console.log` with `process.stderr.write` for immediate output
+  - Force-restarted server (`Stop-Process -Name node -Force`) to clear tsx cache
+- **Status:** Now working! Returns real Nominatim pharmacy data, sorted by distance
 
 ---
 
 ## Parts Not Started Yet
 
-1. **Working Pharmacy API** — needs the Nominatim fetch to work from within Express
-2. **Remove hardcoded fallback data** from PharmacyScreen once API works
-3. **End-to-end testing** — full flow: register → login → chat → pharmacy → history
-4. **Error handling polish** — better error messages in UI for network failures
-5. **Logout button** — no way to log out currently (auth context has `logout()` but no UI trigger in Sidebar/MobileTopBar)
+1. **Remove hardcoded fallback data** from PharmacyScreen — now that API works, remove fallback logic
+2. **End-to-end testing** — full flow: register → login → chat → pharmacy → history
+3. **Error handling polish** — better error messages in UI for network failures
+4. **Logout button** — no way to log out currently (auth context has `logout()` but no UI trigger in Sidebar/MobileTopBar)
 
 ---
 
@@ -96,6 +89,8 @@ npm run dev           # http://localhost:5173
 
 Server runs on `http://localhost:3001`, Vite proxies `/api` requests to it.
 
+**Note on tsx caching:** After modifying server code, fully restart the server to clear tsx cache. In PowerShell: `Stop-Process -Name node -Force` before `npm run server`.
+
 ---
 
 ## File Structure
@@ -106,7 +101,7 @@ server/
   routes/
     auth.ts             # Register + login
     chat.ts             # Placeholder AI chat
-    pharmacy.ts         # Nominatim pharmacy lookup (BROKEN)
+    pharmacy.ts         # Nominatim pharmacy lookup ✅ WORKING
     history.ts          # History CRUD (protected)
     saved-meds.ts       # Saved meds CRUD (protected)
   middleware/
