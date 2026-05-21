@@ -1,31 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { MapPin, Clock, Navigation, Share2, Star, Phone, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { api } from "../../lib/api";
-
-// Fix Leaflet default marker icons (bundlers break the default paths)
-const markerIcon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-const pharmacyIcon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-  className: "pharmacy-marker",
-});
 
 interface Pharmacy {
   id: string;
@@ -53,22 +30,87 @@ const SERVICE_COLORS: Record<string, string> = {
   default: "bg-gray-100 text-gray-600",
 };
 
-function MapUpdater({ center, pharmacies }: { center: [number, number]; pharmacies: Pharmacy[] }) {
-  const map = useMap();
+// Fix Leaflet default icon paths (bundlers break them)
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+function LeafletMap({
+  userPos,
+  pharmacies,
+}: {
+  userPos: [number, number] | null;
+  pharmacies: Pharmacy[];
+}) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.Marker[]>([]);
 
   useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+
+    const map = L.map(mapRef.current, {
+      zoomControl: true,
+      scrollWheelZoom: true,
+    }).setView(userPos || [14.5995, 120.9842], 13);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    mapInstanceRef.current = map;
+  }, []);
+
+  // Update markers when data changes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    // Clear old markers
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    // User marker
+    if (userPos) {
+      const userMarker = L.marker(userPos)
+        .addTo(map)
+        .bindPopup("<strong>You are here</strong>");
+      markersRef.current.push(userMarker);
+    }
+
+    // Pharmacy markers
+    pharmacies.forEach((p) => {
+      if (!p.lat || !p.lng) return;
+      const marker = L.marker([p.lat, p.lng])
+        .addTo(map)
+        .bindPopup(
+          `<div style="min-width:150px"><strong>${p.name}</strong><br><span style="font-size:12px;color:#666">${p.type === "pharmacy" ? "Pharmacy" : "Clinic"}</span><br><span style="font-size:12px">${p.distance}</span></div>`
+        );
+      markersRef.current.push(marker);
+    });
+
+    // Fit bounds
     if (pharmacies.length > 0) {
       const bounds = L.latLngBounds(
         pharmacies.map((p) => [p.lat, p.lng] as [number, number])
       );
-      bounds.extend(center);
+      if (userPos) bounds.extend(userPos);
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
-    } else {
-      map.setView(center, 13);
+    } else if (userPos) {
+      map.setView(userPos, 13);
     }
-  }, [center, pharmacies, map]);
+  }, [userPos, pharmacies]);
 
-  return null;
+  return (
+    <div
+      ref={mapRef}
+      className="w-full rounded-2xl overflow-hidden"
+      style={{ height: "clamp(220px, 30vw, 320px)" }}
+    />
+  );
 }
 
 interface PharmacyScreenProps {
@@ -119,7 +161,6 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
       } catch {
         if (!cancelled) {
           setError("Location access needed for nearby results");
-          // Default to Manila if geolocation fails
           setUserPos([14.5995, 120.9842]);
         }
       } finally {
@@ -132,76 +173,23 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
   }, []);
 
   const filtered = pharmacies.filter((p) => activeTab === "otc" ? p.otcAvailable : p.prescriptionAvailable);
-  const mapCenter = userPos || [14.5995, 120.9842];
 
   return (
     <div className={`${darkMode ? "bg-gray-950" : "bg-gray-50"}`}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
 
-        {/* Page header */}
         <div className="mb-6">
           <h2 className={`${darkMode ? "text-white" : "text-gray-900"}`} style={{ fontSize: "24px", fontWeight: 700 }}>Find Nearby</h2>
           <p className={`${darkMode ? "text-gray-400" : "text-gray-500"}`} style={{ fontSize: "14px" }}>
             {loading ? "Searching nearby pharmacies..." : "Pharmacies and clinics near your location"}
           </p>
-          {error && (
-            <p className="mt-1 text-xs text-amber-500">{error}</p>
-          )}
+          {error && <p className="mt-1 text-xs text-amber-500">{error}</p>}
         </div>
 
         <div className="grid lg:grid-cols-5 gap-6">
-          {/* Left: map + filters */}
+          {/* Left: map + legend */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Real Leaflet map */}
-            <div className="rounded-2xl overflow-hidden" style={{ height: "clamp(220px, 30vw, 320px)" }}>
-              {userPos ? (
-                <MapContainer
-                  center={mapCenter}
-                  zoom={13}
-                  scrollWheelZoom={true}
-                  style={{ height: "100%", width: "100%" }}
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  <MapUpdater center={mapCenter} pharmacies={pharmacies} />
-
-                  {/* User location marker */}
-                  <Marker position={userPos} icon={markerIcon}>
-                    <Popup><strong>You are here</strong></Popup>
-                  </Marker>
-
-                  {/* Pharmacy markers */}
-                  {pharmacies.map((p) => (
-                    <Marker key={p.id} position={[p.lat, p.lng]} icon={pharmacyIcon}>
-                      <Popup>
-                        <div style={{ minWidth: 150 }}>
-                          <strong>{p.name}</strong>
-                          <br />
-                          <span style={{ fontSize: 12, color: "#666" }}>{p.type === "pharmacy" ? "Pharmacy" : "Clinic"}</span>
-                          <br />
-                          <span style={{ fontSize: 12 }}>{p.distance}</span>
-                          {p.address && (
-                            <>
-                              <br />
-                              <span style={{ fontSize: 11, color: "#888" }}>{p.address.slice(0, 60)}</span>
-                            </>
-                          )}
-                        </div>
-                      </Popup>
-                    </Marker>
-                  ))}
-                </MapContainer>
-              ) : (
-                <div className={`w-full h-full flex items-center justify-center ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}>
-                  <div className="text-center">
-                    <Loader2 className="w-6 h-6 text-blue-500 animate-spin mx-auto mb-2" />
-                    <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Loading map...</p>
-                  </div>
-                </div>
-              )}
-            </div>
+            <LeafletMap userPos={userPos} pharmacies={pharmacies} />
 
             <button className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-teal-500 text-white flex items-center justify-center gap-2 min-h-[48px] shadow-md"
               style={{ fontSize: "14px", fontWeight: 600 }}>
@@ -209,7 +197,6 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
               Send Recommendation to Pharmacist
             </button>
 
-            {/* Legend */}
             <div className={`rounded-2xl p-4 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-100 shadow-sm"}`}>
               <p className={`mb-3 ${darkMode ? "text-gray-300" : "text-gray-700"}`} style={{ fontSize: "13px", fontWeight: 600 }}>Map Legend</p>
               <div className="space-y-2">
@@ -230,7 +217,6 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
 
           {/* Right: list */}
           <div className="lg:col-span-3 space-y-4">
-            {/* Tabs */}
             <div className={`flex rounded-xl p-1 ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}>
               {[{ key: "otc", label: "Over-the-Counter" }, { key: "prescription", label: "Get Prescription" }].map((tab) => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key as "otc" | "prescription")}
@@ -281,17 +267,21 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
                           {pharmacy.isOpen ? `Closes ${pharmacy.closingTime}` : pharmacy.closingTime}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                        <span className={`${darkMode ? "text-gray-300" : "text-gray-700"}`} style={{ fontSize: "12px", fontWeight: 600 }}>{pharmacy.rating}</span>
-                      </div>
+                      {pharmacy.rating > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                          <span className={`${darkMode ? "text-gray-300" : "text-gray-700"}`} style={{ fontSize: "12px", fontWeight: 600 }}>{pharmacy.rating}</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {pharmacy.services.map((s) => (
-                        <span key={s} className={`px-2 py-1 rounded-full text-xs ${SERVICE_COLORS[s] || SERVICE_COLORS.default}`}>{s}</span>
-                      ))}
-                    </div>
+                    {pharmacy.services.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {pharmacy.services.map((s) => (
+                          <span key={s} className={`px-2 py-1 rounded-full text-xs ${SERVICE_COLORS[s] || SERVICE_COLORS.default}`}>{s}</span>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="flex gap-2">
                       <button className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 min-h-[44px] ${darkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white"}`}
@@ -299,11 +289,13 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
                         <Navigation className="w-4 h-4" />
                         Directions
                       </button>
-                      <button className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl min-h-[44px] ${darkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700"}`}
-                        style={{ fontSize: "13px", fontWeight: 600 }}>
-                        <Phone className="w-4 h-4" />
-                        Call
-                      </button>
+                      {pharmacy.phone && (
+                        <button className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl min-h-[44px] ${darkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700"}`}
+                          style={{ fontSize: "13px", fontWeight: 600 }}>
+                          <Phone className="w-4 h-4" />
+                          Call
+                        </button>
+                      )}
                     </div>
                   </div>
                 </motion.div>
