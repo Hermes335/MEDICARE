@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MapPin, Clock, Navigation, Share2, Star, Phone, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
+import L from "leaflet";
 import { api } from "../../lib/api";
 
 interface Pharmacy {
@@ -20,12 +21,6 @@ interface Pharmacy {
   lng: number;
 }
 
-const FALLBACK_PHARMACIES: Pharmacy[] = [
-  { id: "1", name: "MediCare Pharmacy", type: "pharmacy", distance: "0.3 km", address: "12 Health Street, Central", isOpen: true, closingTime: "10:00 PM", rating: 4.8, services: ["Prescription filling", "24h service", "Home delivery"], phone: "+1-555-0101", otcAvailable: true, prescriptionAvailable: true, lat: 0, lng: 0 },
-  { id: "2", name: "City Health Clinic", type: "clinic", distance: "0.7 km", address: "45 Wellness Ave, Downtown", isOpen: true, closingTime: "8:00 PM", rating: 4.6, services: ["Doctor consultation", "Prescription writing", "Lab tests"], phone: "+1-555-0102", otcAvailable: false, prescriptionAvailable: true, lat: 0, lng: 0 },
-  { id: "3", name: "QuickMeds Express", type: "pharmacy", distance: "1.1 km", address: "78 Market Rd, Eastside", isOpen: true, closingTime: "Midnight", rating: 4.4, services: ["Prescription filling", "OTC medicines", "Vitamins"], phone: "+1-555-0103", otcAvailable: true, prescriptionAvailable: true, lat: 0, lng: 0 },
-];
-
 const SERVICE_COLORS: Record<string, string> = {
   "24h service": "bg-purple-100 text-purple-700",
   "Home delivery": "bg-blue-100 text-blue-700",
@@ -35,51 +30,86 @@ const SERVICE_COLORS: Record<string, string> = {
   default: "bg-gray-100 text-gray-600",
 };
 
-function MapView({ darkMode }: { darkMode: boolean }) {
-  const pins = [
-    { x: "22%", y: "32%", label: "0.3km", color: "#22c55e" },
-    { x: "48%", y: "52%", label: "0.7km", color: "#3b82f6" },
-    { x: "66%", y: "27%", label: "1.1km", color: "#22c55e" },
-    { x: "18%", y: "63%", label: "1.5km", color: "#6b7280" },
-    { x: "72%", y: "65%", label: "2.0km", color: "#a855f7" },
-    { x: "85%", y: "40%", label: "2.3km", color: "#14b8a6" },
-  ];
+// Fix Leaflet default icon paths (bundlers break them)
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+function LeafletMap({
+  userPos,
+  pharmacies,
+}: {
+  userPos: [number, number] | null;
+  pharmacies: Pharmacy[];
+}) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.Marker[]>([]);
+
+  useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+
+    const map = L.map(mapRef.current, {
+      zoomControl: true,
+      scrollWheelZoom: true,
+    }).setView(userPos || [14.5995, 120.9842], 13);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    mapInstanceRef.current = map;
+  }, []);
+
+  // Update markers when data changes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    // Clear old markers
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    // User marker
+    if (userPos) {
+      const userMarker = L.marker(userPos)
+        .addTo(map)
+        .bindPopup("<strong>You are here</strong>");
+      markersRef.current.push(userMarker);
+    }
+
+    // Pharmacy markers
+    pharmacies.forEach((p) => {
+      if (!p.lat || !p.lng) return;
+      const marker = L.marker([p.lat, p.lng])
+        .addTo(map)
+        .bindPopup(
+          `<div style="min-width:150px"><strong>${p.name}</strong><br><span style="font-size:12px;color:#666">${p.type === "pharmacy" ? "Pharmacy" : "Clinic"}</span><br><span style="font-size:12px">${p.distance}</span></div>`
+        );
+      markersRef.current.push(marker);
+    });
+
+    // Fit bounds
+    if (pharmacies.length > 0) {
+      const bounds = L.latLngBounds(
+        pharmacies.map((p) => [p.lat, p.lng] as [number, number])
+      );
+      if (userPos) bounds.extend(userPos);
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+    } else if (userPos) {
+      map.setView(userPos, 13);
+    }
+  }, [userPos, pharmacies]);
 
   return (
-    <div className={`relative w-full rounded-2xl overflow-hidden ${darkMode ? "bg-gray-800" : "bg-blue-50"}`} style={{ height: "clamp(180px, 25vw, 280px)" }}>
-      <svg width="100%" height="100%" className="absolute inset-0 opacity-30">
-        <defs>
-          <pattern id="grid2" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke={darkMode ? "#4b5563" : "#93c5fd"} strokeWidth="0.5" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#grid2)" />
-        <line x1="0" y1="80" x2="100%" y2="80" stroke={darkMode ? "#374151" : "#bfdbfe"} strokeWidth="3" />
-        <line x1="0" y1="140" x2="100%" y2="140" stroke={darkMode ? "#374151" : "#bfdbfe"} strokeWidth="2" />
-        <line x1="150" y1="0" x2="150" y2="100%" stroke={darkMode ? "#374151" : "#bfdbfe"} strokeWidth="3" />
-        <line x1="300" y1="0" x2="300" y2="100%" stroke={darkMode ? "#374151" : "#bfdbfe"} strokeWidth="2" />
-        <line x1="450" y1="0" x2="450" y2="100%" stroke={darkMode ? "#374151" : "#bfdbfe"} strokeWidth="2" />
-      </svg>
-      <div className="absolute" style={{ left: "46%", top: "44%", transform: "translate(-50%,-50%)" }}>
-        <div className="w-5 h-5 rounded-full bg-blue-500 border-2 border-white shadow-lg flex items-center justify-center">
-          <div className="w-2 h-2 rounded-full bg-white" />
-        </div>
-        <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-1.5 py-0.5 rounded text-xs whitespace-nowrap">You</div>
-      </div>
-      {pins.map((pin, i) => (
-        <motion.div key={i} initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: i * 0.1 + 0.3 }}
-          className="absolute flex flex-col items-center" style={{ left: pin.x, top: pin.y, transform: "translate(-50%, -100%)" }}>
-          <div className="w-8 h-8 rounded-full flex items-center justify-center shadow-md" style={{ backgroundColor: pin.color }}>
-            <MapPin className="w-4 h-4 text-white" />
-          </div>
-          <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent" style={{ borderTopColor: pin.color }} />
-          <span className="text-white px-1 py-0.5 rounded mt-0.5 shadow" style={{ backgroundColor: pin.color, fontSize: "10px" }}>{pin.label}</span>
-        </motion.div>
-      ))}
-      <div className={`absolute bottom-2 right-2 px-2 py-1 rounded-lg ${darkMode ? "bg-gray-900/80" : "bg-white/90"} shadow text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-        Simulated map
-      </div>
-    </div>
+    <div
+      ref={mapRef}
+      className="w-full rounded-2xl overflow-hidden"
+      style={{ height: "clamp(220px, 30vw, 320px)" }}
+    />
   );
 }
 
@@ -92,6 +122,7 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [userPos, setUserPos] = useState<[number, number] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,11 +131,13 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
       try {
         const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
           if (!navigator.geolocation) reject(new Error("Geolocation not supported"));
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 });
         });
 
         if (cancelled) return;
         const { latitude, longitude } = pos.coords;
+        setUserPos([latitude, longitude]);
+
         const data = await api.pharmacy.nearby(latitude, longitude);
 
         if (cancelled) return;
@@ -124,11 +157,11 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
           lat: p.lat,
           lng: p.lng,
         }));
-        setPharmacies(mapped.length > 0 ? mapped : FALLBACK_PHARMACIES);
+        setPharmacies(mapped);
       } catch {
         if (!cancelled) {
-          setPharmacies(FALLBACK_PHARMACIES);
-          setError("Using sample data — location access needed for nearby results");
+          setError("Location access needed for nearby results");
+          setUserPos([14.5995, 120.9842]);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -145,21 +178,18 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
     <div className={`${darkMode ? "bg-gray-950" : "bg-gray-50"}`}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
 
-        {/* Page header */}
         <div className="mb-6">
           <h2 className={`${darkMode ? "text-white" : "text-gray-900"}`} style={{ fontSize: "24px", fontWeight: 700 }}>Find Nearby</h2>
           <p className={`${darkMode ? "text-gray-400" : "text-gray-500"}`} style={{ fontSize: "14px" }}>
             {loading ? "Searching nearby pharmacies..." : "Pharmacies and clinics near your location"}
           </p>
-          {error && (
-            <p className="mt-1 text-xs text-amber-500">{error}</p>
-          )}
+          {error && <p className="mt-1 text-xs text-amber-500">{error}</p>}
         </div>
 
         <div className="grid lg:grid-cols-5 gap-6">
-          {/* Left: map + filters */}
+          {/* Left: map + legend */}
           <div className="lg:col-span-2 space-y-4">
-            <MapView darkMode={darkMode} />
+            <LeafletMap userPos={userPos} pharmacies={pharmacies} />
 
             <button className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-teal-500 text-white flex items-center justify-center gap-2 min-h-[48px] shadow-md"
               style={{ fontSize: "14px", fontWeight: 600 }}>
@@ -167,7 +197,6 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
               Send Recommendation to Pharmacist
             </button>
 
-            {/* Legend */}
             <div className={`rounded-2xl p-4 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-100 shadow-sm"}`}>
               <p className={`mb-3 ${darkMode ? "text-gray-300" : "text-gray-700"}`} style={{ fontSize: "13px", fontWeight: 600 }}>Map Legend</p>
               <div className="space-y-2">
@@ -188,7 +217,6 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
 
           {/* Right: list */}
           <div className="lg:col-span-3 space-y-4">
-            {/* Tabs */}
             <div className={`flex rounded-xl p-1 ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}>
               {[{ key: "otc", label: "Over-the-Counter" }, { key: "prescription", label: "Get Prescription" }].map((tab) => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key as "otc" | "prescription")}
@@ -239,17 +267,21 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
                           {pharmacy.isOpen ? `Closes ${pharmacy.closingTime}` : pharmacy.closingTime}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                        <span className={`${darkMode ? "text-gray-300" : "text-gray-700"}`} style={{ fontSize: "12px", fontWeight: 600 }}>{pharmacy.rating}</span>
-                      </div>
+                      {pharmacy.rating > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                          <span className={`${darkMode ? "text-gray-300" : "text-gray-700"}`} style={{ fontSize: "12px", fontWeight: 600 }}>{pharmacy.rating}</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {pharmacy.services.map((s) => (
-                        <span key={s} className={`px-2 py-1 rounded-full text-xs ${SERVICE_COLORS[s] || SERVICE_COLORS.default}`}>{s}</span>
-                      ))}
-                    </div>
+                    {pharmacy.services.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {pharmacy.services.map((s) => (
+                          <span key={s} className={`px-2 py-1 rounded-full text-xs ${SERVICE_COLORS[s] || SERVICE_COLORS.default}`}>{s}</span>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="flex gap-2">
                       <button className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 min-h-[44px] ${darkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white"}`}
@@ -257,15 +289,23 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
                         <Navigation className="w-4 h-4" />
                         Directions
                       </button>
-                      <button className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl min-h-[44px] ${darkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700"}`}
-                        style={{ fontSize: "13px", fontWeight: 600 }}>
-                        <Phone className="w-4 h-4" />
-                        Call
-                      </button>
+                      {pharmacy.phone && (
+                        <button className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl min-h-[44px] ${darkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700"}`}
+                          style={{ fontSize: "13px", fontWeight: 600 }}>
+                          <Phone className="w-4 h-4" />
+                          Call
+                        </button>
+                      )}
                     </div>
                   </div>
                 </motion.div>
               ))}
+              {!loading && filtered.length === 0 && !error && (
+                <div className={`text-center py-12 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                  <MapPin className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No pharmacies found nearby</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

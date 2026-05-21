@@ -9,8 +9,10 @@ import {
   AlertTriangle,
   PanelLeftClose,
   PanelLeftOpen,
+  LogOut,
 } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "../../lib/auth";
 
 export type Screen = "home" | "chat" | "pharmacy" | "history";
 
@@ -57,6 +59,7 @@ export function Sidebar({
   hasChat,
 }: NavComponentProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const { user, logout } = useAuth();
 
   return (
     <aside
@@ -219,6 +222,37 @@ export function Sidebar({
           )}
         </button>
 
+        {/* Logout button */}
+        <button
+          onClick={logout}
+          title={collapsed ? "Sign Out" : undefined}
+          className={`w-full flex items-center rounded-lg transition-all ${
+            collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5"
+          } ${
+            darkMode
+              ? "text-gray-500 hover:bg-red-900/20 hover:text-red-400"
+              : "text-gray-500 hover:bg-red-50 hover:text-red-600"
+          }`}
+        >
+          <div
+            className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+              darkMode ? "bg-gray-800" : "bg-gray-100"
+            }`}
+          >
+            <LogOut className="w-[18px] h-[18px]" />
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="text-sm leading-tight">Sign Out</p>
+              {user && (
+                <p className={`text-[11px] leading-tight mt-0.5 truncate ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                  {user.email}
+                </p>
+              )}
+            </div>
+          )}
+        </button>
+
         {/* Disclaimer — hidden when collapsed */}
         {!collapsed && (
           <div
@@ -253,6 +287,8 @@ export function MobileTopBar({
   darkMode,
   onToggleDark,
 }: Pick<NavComponentProps, "darkMode" | "onToggleDark">) {
+  const { logout } = useAuth();
+
   return (
     <header
       className={`md:hidden flex items-center justify-between px-4 h-14 border-b flex-shrink-0 ${
@@ -273,20 +309,32 @@ export function MobileTopBar({
           MediGuide
         </p>
       </div>
-      <button
-        onClick={onToggleDark}
-        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
-          darkMode
-            ? "bg-gray-800 text-yellow-300"
-            : "bg-gray-100 text-gray-600"
-        }`}
-      >
-        {darkMode ? (
-          <Sun className="w-[16px] h-[16px]" />
-        ) : (
-          <Moon className="w-[16px] h-[16px]" />
-        )}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onToggleDark}
+          className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+            darkMode
+              ? "bg-gray-800 text-yellow-300"
+              : "bg-gray-100 text-gray-600"
+          }`}
+        >
+          {darkMode ? (
+            <Sun className="w-[16px] h-[16px]" />
+          ) : (
+            <Moon className="w-[16px] h-[16px]" />
+          )}
+        </button>
+        <button
+          onClick={logout}
+          className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+            darkMode
+              ? "bg-gray-800 text-gray-400 hover:text-red-400"
+              : "bg-gray-100 text-gray-500 hover:text-red-600"
+          }`}
+        >
+          <LogOut className="w-[16px] h-[16px]" />
+        </button>
+      </div>
     </header>
   );
 }

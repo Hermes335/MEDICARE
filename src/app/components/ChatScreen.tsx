@@ -246,6 +246,8 @@ export function ChatScreen({ initialSymptom, darkMode, onNavigateToPharmacy }: C
     try {
       const { ack, medicine } = await api.chat.send(text);
       setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: "bot", symptomAck: ack, medicine, timestamp: new Date() }]);
+      // Persist to history
+      api.history.add({ symptom: text, medicine: medicine.name, severity: "mild" }).catch(() => {});
     } catch {
       setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: "bot", text: "Sorry, something went wrong. Please try again.", timestamp: new Date() }]);
     } finally {
@@ -253,8 +255,12 @@ export function ChatScreen({ initialSymptom, darkMode, onNavigateToPharmacy }: C
     }
   };
 
-  const toggleSave = (medName: string) => {
-    setSavedMeds((prev) => { const n = new Set(prev); n.has(medName) ? n.delete(medName) : n.add(medName); return n; });
+  const toggleSave = (medName: string, med?: MedicineCard) => {
+    const isSaved = savedMeds.has(medName);
+    setSavedMeds((prev) => { const n = new Set(prev); isSaved ? n.delete(medName) : n.add(medName); return n; });
+    if (!isSaved && med) {
+      api.savedMeds.add({ name: med.name, use: med.whatItDoes?.slice(0, 80), icon: med.icon, stock: "" }).catch(() => {});
+    }
   };
 
   return (
@@ -313,7 +319,7 @@ export function ChatScreen({ initialSymptom, darkMode, onNavigateToPharmacy }: C
                     )}
                     {msg.medicine && (
                       <MedicineCardComponent med={msg.medicine} darkMode={darkMode}
-                        saved={savedMeds.has(msg.medicine.name)} onSave={() => toggleSave(msg.medicine!.name)}
+                        saved={savedMeds.has(msg.medicine.name)} onSave={() => toggleSave(msg.medicine!.name, msg.medicine!)}
                         onFindPharmacy={onNavigateToPharmacy} />
                     )}
                   </div>

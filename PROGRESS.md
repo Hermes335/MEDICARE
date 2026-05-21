@@ -1,5 +1,5 @@
 # MEDIBoT - Backend Integration Progress
-**Date: 2026-05-21**
+**Last updated: 2026-05-21**
 
 ---
 
@@ -8,72 +8,59 @@
 ### 1. Navbar Redesign (DONE)
 - Rewrote `NavBar.tsx` into 3 components:
   - `Sidebar` — Desktop sidebar (w-64, collapsible to icon-only)
-  - `MobileTopBar` — Mobile top bar with logo + dark mode toggle
+  - `MobileTopBar` — Mobile top bar with logo + dark mode + logout
   - `BottomNav` — Mobile bottom tab bar (4 tabs, 44px touch targets)
 - Updated `App.tsx` with new flex layout (sidebar + main content column)
 - Sidebar is collapsible with `PanelLeftClose`/`PanelLeftOpen` toggle
 - Pure Tailwind CSS, lucide-react icons, dark mode support
+- Logout button in Sidebar (shows user email) and MobileTopBar
 
 ### 2. Backend Server Setup (DONE)
-- Created `server/` directory with Express.js + TypeScript
-- Installed dependencies: express, better-sqlite3, jsonwebtoken, bcryptjs, cors, tsx
+- Express.js + TypeScript server
+- Dependencies: express, better-sqlite3, jsonwebtoken, bcryptjs, cors, tsx, undici
 - SQLite database (`mediguide.db`) with tables: users, history_entries, saved_meds
-- JWT auth middleware
+- JWT auth middleware (7-day token expiry)
 - Vite proxy configured (`/api` → `localhost:3001`)
 
 ### 3. Auth Routes (DONE & TESTED)
-- `POST /api/auth/register` — works, returns token + user
-- `POST /api/auth/login` — works, returns token + user
-- Password hashing with bcryptjs, JWT tokens (7-day expiry)
+- `POST /api/auth/register` — returns token + user
+- `POST /api/auth/login` — returns token + user
+- Password hashing with bcryptjs
 
 ### 4. Chat Placeholder Endpoint (DONE & TESTED)
-- `POST /api/chat` — works, returns hardcoded MedicineCard responses
+- `POST /api/chat` — returns hardcoded MedicineCard responses
 - String matching on symptom keywords (headache, fever, cough, stomach, allerg)
 - 800ms simulated delay
-- Same response structure as old mock, ready to swap in real AI model
+- Ready to swap in real AI model when training completes
 
 ### 5. History & Saved Meds Routes (DONE & TESTED)
-- `GET/POST/DELETE /api/history` — protected, per-user
-- `GET/POST/DELETE /api/saved-meds` — protected, per-user
-- All CRUD operations work with SQLite
+- `GET/POST/DELETE /api/history` — JWT-protected, per-user
+- `GET/POST/DELETE /api/saved-meds` — JWT-protected, per-user
 
-### 6. Frontend Integration (PARTIALLY DONE)
-- `src/lib/api.ts` — fetch wrapper with auth token handling
-- `src/lib/auth.tsx` — React context (AuthProvider, useAuth hook)
-- `src/app/components/LoginScreen.tsx` — login/register form with tab switcher
-- `App.tsx` — wraps with AuthProvider, shows LoginScreen if not authenticated
-- `ChatScreen.tsx` — updated to call `POST /api/chat` instead of mock
-- `HistoryScreen.tsx` — updated to fetch from `/api/history` and `/api/saved-meds`
+### 6. Frontend Integration (DONE)
+- `src/lib/api.ts` — fetch wrapper with auth token, covers all 10 API endpoints
+- `src/lib/auth.tsx` — AuthProvider + useAuth hook, localStorage persistence
+- `src/app/components/LoginScreen.tsx` — login/register form with validation
+- `App.tsx` — AuthProvider wraps app, LoginScreen shown if not authenticated
+- `ChatScreen.tsx` — calls `POST /api/chat`, persists history via `api.history.add()`, persists saved meds via `api.savedMeds.add()`
+- `PharmacyScreen.tsx` — fetches from `/api/pharmacy/nearby` with geolocation, real Leaflet map
+- `HistoryScreen.tsx` — fetches from `/api/history` and `/api/saved-meds`
 - Voice input (Mic icon) removed from ChatScreen
 
-### 7. Pharmacy Screen (PARTIALLY DONE)
-- `PharmacyScreen.tsx` — updated to fetch from `/api/pharmacy/nearby` with geolocation
-- Falls back to sample data if geolocation unavailable
-- Added loading spinner
+### 7. Pharmacy Endpoint (DONE & TESTED)
+- `GET /api/pharmacy/nearby` — queries Nominatim OpenStreetMap API
+- Uses `undici.fetch` + `child_process` fallback for network isolation issue
+- Calculates distances with haversine formula, returns sorted results
 
----
+### 8. Interactive Map (DONE)
+- Real Leaflet map with OpenStreetMap tiles (no API key needed)
+- User location marker + pharmacy markers with popups
+- Auto-fits bounds to show all results
+- Installed: `leaflet` (plain, no react-leaflet wrapper — avoids React 18/19 peer dep conflict)
 
-## Known Issues
-
-### Pharmacy Endpoint — FIXED ✅
-- **Problem (was):** `GET /api/pharmacy/nearby` returned `{"error":"Failed to fetch pharmacy data"}`
-- **Root cause:** 
-  - Direct `fetch` in tsx runtime was failing (isolation/DNS/network issue)
-  - tsx caching issue prevented code reloads from taking effect
-- **Solution:**
-  - Switched to `undici.fetch` (explicit Node HTTP client instead of global fetch)
-  - Replaced `console.log` with `process.stderr.write` for immediate output
-  - Force-restarted server (`Stop-Process -Name node -Force`) to clear tsx cache
-- **Status:** Now working! Returns real Nominatim pharmacy data, sorted by distance
-
----
-
-## Parts Not Started Yet
-
-1. **Remove hardcoded fallback data** from PharmacyScreen — now that API works, remove fallback logic
-2. **End-to-end testing** — full flow: register → login → chat → pharmacy → history
-3. **Error handling polish** — better error messages in UI for network failures
-4. **Logout button** — no way to log out currently (auth context has `logout()` but no UI trigger in Sidebar/MobileTopBar)
+### 9. End-to-End Testing (DONE)
+- Full flow verified via curl: register → login → chat → history → saved-meds → pharmacy
+- All endpoints return correct data
 
 ---
 
@@ -89,7 +76,7 @@ npm run dev           # http://localhost:5173
 
 Server runs on `http://localhost:3001`, Vite proxies `/api` requests to it.
 
-**Note on tsx caching:** After modifying server code, fully restart the server to clear tsx cache. In PowerShell: `Stop-Process -Name node -Force` before `npm run server`.
+**Note:** After modifying server code, fully restart the server to clear tsx cache.
 
 ---
 
@@ -98,23 +85,33 @@ Server runs on `http://localhost:3001`, Vite proxies `/api` requests to it.
 server/
   index.ts              # Express entry point
   db.ts                 # SQLite setup + schema
+  standalone-pharmacy.cjs  # Child_process fallback for pharmacy fetch
   routes/
     auth.ts             # Register + login
     chat.ts             # Placeholder AI chat
-    pharmacy.ts         # Nominatim pharmacy lookup ✅ WORKING
+    pharmacy.ts         # Nominatim pharmacy lookup
     history.ts          # History CRUD (protected)
     saved-meds.ts       # Saved meds CRUD (protected)
   middleware/
     auth.ts             # JWT verification
 
 src/lib/
-  api.ts                # Frontend fetch wrapper
+  api.ts                # Frontend fetch wrapper (all endpoints)
   auth.tsx              # Auth context + hook
 
 src/app/components/
   LoginScreen.tsx       # Login/register form
-  NavBar.tsx            # Sidebar + BottomNav + MobileTopBar
-  ChatScreen.tsx        # Updated to use API
-  PharmacyScreen.tsx    # Updated to use API (falls back to sample data)
-  HistoryScreen.tsx     # Updated to use API
+  NavBar.tsx            # Sidebar + BottomNav + MobileTopBar (with logout)
+  ChatScreen.tsx        # Chat with placeholder AI + save/history persistence
+  PharmacyScreen.tsx    # Real Leaflet map + Nominatim pharmacy data
+  HistoryScreen.tsx     # History + saved meds from API
 ```
+
+---
+
+## Remaining / Nice-to-Have
+
+1. **Swap in real AI model** — replace placeholder chat endpoint when model training completes
+2. **Error handling polish** — better error messages in UI for network failures
+3. **Stale token handling** — auto-logout when JWT expires (currently stays "logged in" with stale token)
+4. **ChatScreen MOCK_RESPONSES cleanup** — remove dead code once real model is integrated
