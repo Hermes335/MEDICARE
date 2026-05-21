@@ -16,6 +16,13 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", service: "MediGuide API" });
 });
 
+// Helpful root page for browser visits
+app.get("/", (_req, res) => {
+  res.send(
+    `<!doctype html><html><head><meta charset="utf-8"><title>MediGuide API</title></head><body><h1>MediGuide API</h1><p>API is running. Try <a href="/api/health">/api/health</a> or use the frontend at <a href="http://localhost:5173">http://localhost:5173</a>.</p></body></html>`
+  );
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/pharmacy", pharmacyRoutes);
