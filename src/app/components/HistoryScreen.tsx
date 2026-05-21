@@ -64,6 +64,11 @@ export function HistoryScreen({ darkMode }: HistoryScreenProps) {
     setEntries((prev) => prev.filter((e) => e.id !== id));
   };
 
+  const handleDeleteSavedMed = async (id: string) => {
+    await api.savedMeds.remove(id);
+    setSavedMeds((prev) => prev.filter((m) => m.id !== id));
+  };
+
   const handleExport = () => {
     setShowExportSuccess(true);
     setTimeout(() => setShowExportSuccess(false), 2500);
@@ -181,7 +186,7 @@ export function HistoryScreen({ darkMode }: HistoryScreenProps) {
         {activeTab === "saved" && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {savedMeds.map((med, i) => (
-              <motion.div key={med.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
+              <motion.div key={med.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                 className={`rounded-2xl p-4 flex items-center gap-3 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-100 shadow-sm"}`}>
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${darkMode ? "bg-blue-900/30" : "bg-blue-50"}`}>
                   <span style={{ fontSize: "24px" }}>{med.icon}</span>
@@ -189,11 +194,24 @@ export function HistoryScreen({ darkMode }: HistoryScreenProps) {
                 <div className="flex-1 min-w-0">
                   <p className={`${darkMode ? "text-white" : "text-gray-900"}`} style={{ fontSize: "14px", fontWeight: 600 }}>{med.name}</p>
                   <p className={`${darkMode ? "text-gray-400" : "text-gray-500"}`} style={{ fontSize: "12px" }}>{med.use}</p>
-                  <p className={`${darkMode ? "text-blue-400" : "text-blue-500"}`} style={{ fontSize: "11px", marginTop: "2px" }}>{med.stock}</p>
+                  {med.stock && (
+                    <p className={`${darkMode ? "text-blue-400" : "text-blue-500"}`} style={{ fontSize: "11px", marginTop: "2px" }}>{med.stock}</p>
+                  )}
                 </div>
-                <ChevronRight className={`w-4 h-4 flex-shrink-0 ${darkMode ? "text-gray-600" : "text-gray-400"}`} />
+                <button onClick={() => handleDeleteSavedMed(med.id)}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? "text-gray-600 hover:bg-red-900/30 hover:text-red-400" : "text-gray-400 hover:bg-red-50 hover:text-red-500"}`}>
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </motion.div>
             ))}
+            {savedMeds.length === 0 && (
+              <div className="col-span-full text-center py-16">
+                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                  <Pill className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className={`${darkMode ? "text-gray-400" : "text-gray-500"}`} style={{ fontSize: "15px" }}>No saved medications yet. Bookmark medicines from chat.</p>
+              </div>
+            )}
           </div>
         )}
 
