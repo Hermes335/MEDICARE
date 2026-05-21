@@ -1,10 +1,20 @@
+import {
+  Home,
+  MessageSquare,
+  MapPin,
+  Clock,
+  Pill,
+  Moon,
+  Sun,
+  AlertTriangle,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react";
 import { useState } from "react";
-import { Home, MessageSquare, MapPin, Clock, Pill, Moon, Sun, Menu, X } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
 
 export type Screen = "home" | "chat" | "pharmacy" | "history";
 
-interface NavBarProps {
+interface NavComponentProps {
   active: Screen;
   onNavigate: (screen: Screen) => void;
   darkMode: boolean;
@@ -12,190 +22,312 @@ interface NavBarProps {
   hasChat: boolean;
 }
 
-const NAV_ITEMS: { key: Screen; label: string; Icon: React.ElementType }[] = [
-  { key: "home", label: "Home", Icon: Home },
-  { key: "chat", label: "Chat", Icon: MessageSquare },
-  { key: "pharmacy", label: "Nearby", Icon: MapPin },
-  { key: "history", label: "Records", Icon: Clock },
+const NAV_ITEMS: {
+  key: Screen;
+  label: string;
+  subdescription: string;
+  Icon: React.ElementType;
+}[] = [
+  { key: "home", label: "Home", subdescription: "Symptom checker", Icon: Home },
+  {
+    key: "chat",
+    label: "Chat",
+    subdescription: "AI recommendations",
+    Icon: MessageSquare,
+  },
+  {
+    key: "pharmacy",
+    label: "Nearby",
+    subdescription: "Find pharmacies",
+    Icon: MapPin,
+  },
+  {
+    key: "history",
+    label: "Records",
+    subdescription: "Health history",
+    Icon: Clock,
+  },
 ];
 
-export function NavBar({ active, onNavigate, darkMode, onToggleDark, hasChat }: NavBarProps) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+export function Sidebar({
+  active,
+  onNavigate,
+  darkMode,
+  onToggleDark,
+  hasChat,
+}: NavComponentProps) {
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <nav
-      className={`sticky top-0 z-50 w-full border-b backdrop-blur-md ${
+    <aside
+      className={`hidden md:flex flex-col h-screen flex-shrink-0 border-r transition-[width] duration-200 ease-in-out ${
+        collapsed ? "w-[68px]" : "w-64"
+      } ${
         darkMode
-          ? "bg-gray-900/95 border-gray-800"
-          : "bg-white/95 border-gray-100"
+          ? "bg-gray-900 border-gray-800"
+          : "bg-white border-gray-200"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-blue-500 flex items-center justify-center shadow-md">
-              <Pill className="w-4.5 h-4.5 text-white" style={{ width: "18px", height: "18px" }} />
-            </div>
+      {/* Logo area + collapse toggle */}
+      <div className={`pt-6 pb-4 flex items-start ${collapsed ? "px-2 justify-center" : "px-5 justify-between"}`}>
+        <div className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}>
+          <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center shadow-md flex-shrink-0">
+            <Pill className="w-5 h-5 text-white" />
+          </div>
+          {!collapsed && (
             <div>
               <p
-                className={`${darkMode ? "text-white" : "text-blue-900"}`}
-                style={{ fontSize: "17px", fontWeight: 700, lineHeight: 1.2 }}
+                className={`text-[17px] font-bold leading-tight ${
+                  darkMode ? "text-white" : "text-blue-900"
+                }`}
               >
                 MediGuide
               </p>
               <p
-                className={`${darkMode ? "text-blue-400" : "text-blue-500"}`}
-                style={{ fontSize: "10px" }}
+                className={`text-[10px] ${
+                  darkMode ? "text-blue-400" : "text-blue-500"
+                }`}
               >
                 AI Pharmaceutical Assistant
               </p>
             </div>
-          </div>
-
-          {/* Desktop nav links */}
-          <div className="hidden md:flex items-center gap-1">
-            {NAV_ITEMS.map(({ key, label, Icon }) => {
-              const isActive = active === key;
-              const isDisabled = key === "chat" && !hasChat;
-              return (
-                <button
-                  key={key}
-                  onClick={() => !isDisabled && onNavigate(key)}
-                  disabled={isDisabled}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
-                    isActive
-                      ? darkMode
-                        ? "bg-blue-600/20 text-blue-400"
-                        : "bg-blue-50 text-blue-700"
-                      : isDisabled
-                        ? "opacity-40 cursor-default"
-                        : darkMode
-                          ? "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
-                  style={{ fontSize: "14px", fontWeight: isActive ? 600 : 400 }}
-                >
-                  <Icon style={{ width: "16px", height: "16px" }} />
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Right side: dark mode toggle + mobile hamburger */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onToggleDark}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-                darkMode
-                  ? "bg-gray-800 text-yellow-300 hover:bg-gray-700"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              {darkMode ? (
-                <Sun style={{ width: "16px", height: "16px" }} />
-              ) : (
-                <Moon style={{ width: "16px", height: "16px" }} />
-              )}
-            </button>
-
-            {/* Mobile menu button */}
-            <button
-              onClick={() => setMobileMenuOpen((v) => !v)}
-              className={`md:hidden w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-                darkMode
-                  ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              {mobileMenuOpen ? (
-                <X style={{ width: "18px", height: "18px" }} />
-              ) : (
-                <Menu style={{ width: "18px", height: "18px" }} />
-              )}
-            </button>
-          </div>
+          )}
         </div>
-      </div>
-
-      {/* Mobile dropdown menu */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className={`md:hidden overflow-hidden border-t ${
-              darkMode ? "border-gray-800" : "border-gray-100"
+        {!collapsed && (
+          <button
+            onClick={() => setCollapsed(true)}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
+              darkMode
+                ? "text-gray-500 hover:bg-gray-800 hover:text-gray-300"
+                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             }`}
           >
-            <div className="px-4 py-3 space-y-1">
-              {NAV_ITEMS.map(({ key, label, Icon }) => {
-                const isActive = active === key;
-                const isDisabled = key === "chat" && !hasChat;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      if (!isDisabled) {
-                        onNavigate(key);
-                        setMobileMenuOpen(false);
-                      }
-                    }}
-                    disabled={isDisabled}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                      isActive
-                        ? darkMode
-                          ? "bg-blue-600/20 text-blue-400"
-                          : "bg-blue-50 text-blue-700"
-                        : isDisabled
-                          ? "opacity-40 cursor-default"
-                          : darkMode
-                            ? "text-gray-400 hover:bg-gray-800"
-                            : "text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    <div
-                      className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                        isActive
-                          ? darkMode
-                            ? "bg-blue-600/30"
-                            : "bg-blue-100"
-                          : darkMode
-                            ? "bg-gray-800"
-                            : "bg-gray-100"
-                      }`}
-                    >
-                      <Icon style={{ width: "18px", height: "18px" }} />
-                    </div>
-                    <span style={{ fontSize: "15px", fontWeight: isActive ? 600 : 400 }}>
-                      {label}
-                    </span>
-                  </button>
-                );
-              })}
+            <PanelLeftClose className="w-[16px] h-[16px]" />
+          </button>
+        )}
+      </div>
 
-              {/* Disclaimer */}
+      {/* Expand button when collapsed */}
+      {collapsed && (
+        <div className="px-2 pb-2">
+          <button
+            onClick={() => setCollapsed(false)}
+            className={`w-full flex items-center justify-center h-8 rounded-lg transition-all ${
+              darkMode
+                ? "text-gray-500 hover:bg-gray-800 hover:text-gray-300"
+                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            }`}
+          >
+            <PanelLeftOpen className="w-[16px] h-[16px]" />
+          </button>
+        </div>
+      )}
+
+      {/* Nav links */}
+      <nav className={`flex-1 py-2 space-y-1 ${collapsed ? "px-2" : "px-3"}`}>
+        {NAV_ITEMS.map(({ key, label, subdescription, Icon }) => {
+          const isActive = active === key;
+          const isDisabled = key === "chat" && !hasChat;
+          return (
+            <button
+              key={key}
+              onClick={() => !isDisabled && onNavigate(key)}
+              disabled={isDisabled}
+              title={collapsed ? label : undefined}
+              className={`relative w-full flex items-center rounded-lg transition-all text-left ${
+                collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5"
+              } ${
+                isActive
+                  ? darkMode
+                    ? "bg-blue-600/20 text-blue-400"
+                    : "bg-blue-50 text-blue-700"
+                  : isDisabled
+                    ? "opacity-40 cursor-default"
+                    : darkMode
+                      ? "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              }`}
+            >
+              {/* Active accent bar */}
+              {isActive && (
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-l-full bg-blue-500" />
+              )}
               <div
-                className={`mt-3 px-4 py-3 rounded-xl ${
-                  darkMode
-                    ? "bg-amber-950/40 border border-amber-800/30"
-                    : "bg-amber-50 border border-amber-100"
+                className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  isActive
+                    ? darkMode
+                      ? "bg-blue-600/30"
+                      : "bg-blue-100"
+                    : darkMode
+                      ? "bg-gray-800"
+                      : "bg-gray-100"
                 }`}
               >
-                <p
-                  className={`${darkMode ? "text-amber-400" : "text-amber-700"}`}
-                  style={{ fontSize: "11px", lineHeight: 1.5 }}
-                >
-                  Not a substitute for professional medical advice.
-                </p>
+                <Icon className="w-[18px] h-[18px]" />
               </div>
+              {!collapsed && (
+                <div className="min-w-0">
+                  <p
+                    className="text-sm leading-tight"
+                    style={{ fontWeight: isActive ? 600 : 400 }}
+                  >
+                    {label}
+                  </p>
+                  <p
+                    className={`text-[11px] leading-tight mt-0.5 ${
+                      darkMode ? "text-gray-500" : "text-gray-400"
+                    }`}
+                  >
+                    {subdescription}
+                  </p>
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Bottom section */}
+      <div className={`pb-4 space-y-3 ${collapsed ? "px-2" : "px-3"}`}>
+        {/* Dark mode toggle */}
+        <button
+          onClick={onToggleDark}
+          title={collapsed ? (darkMode ? "Light Mode" : "Dark Mode") : undefined}
+          className={`w-full flex items-center rounded-lg transition-all ${
+            collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5"
+          } ${
+            darkMode
+              ? "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+          }`}
+        >
+          <div
+            className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+              darkMode ? "bg-gray-800" : "bg-gray-100"
+            }`}
+          >
+            {darkMode ? (
+              <Sun className="w-[18px] h-[18px] text-yellow-300" />
+            ) : (
+              <Moon className="w-[18px] h-[18px]" />
+            )}
+          </div>
+          {!collapsed && (
+            <span className="text-sm">
+              {darkMode ? "Light Mode" : "Dark Mode"}
+            </span>
+          )}
+        </button>
+
+        {/* Disclaimer — hidden when collapsed */}
+        {!collapsed && (
+          <div
+            className={`px-3 py-2.5 rounded-lg ${
+              darkMode
+                ? "bg-amber-950/40 border border-amber-800/30"
+                : "bg-amber-50 border border-amber-200"
+            }`}
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle
+                className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${
+                  darkMode ? "text-amber-400" : "text-amber-500"
+                }`}
+              />
+              <p
+                className={`text-[11px] leading-relaxed ${
+                  darkMode ? "text-amber-400" : "text-amber-700"
+                }`}
+              >
+                Not a substitute for professional medical advice.
+              </p>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+      </div>
+    </aside>
+  );
+}
+
+export function MobileTopBar({
+  darkMode,
+  onToggleDark,
+}: Pick<NavComponentProps, "darkMode" | "onToggleDark">) {
+  return (
+    <header
+      className={`md:hidden flex items-center justify-between px-4 h-14 border-b flex-shrink-0 ${
+        darkMode
+          ? "bg-gray-900 border-gray-800"
+          : "bg-white border-gray-200"
+      }`}
+    >
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center shadow-sm">
+          <Pill className="w-4 h-4 text-white" />
+        </div>
+        <p
+          className={`text-[15px] font-bold ${
+            darkMode ? "text-white" : "text-blue-900"
+          }`}
+        >
+          MediGuide
+        </p>
+      </div>
+      <button
+        onClick={onToggleDark}
+        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+          darkMode
+            ? "bg-gray-800 text-yellow-300"
+            : "bg-gray-100 text-gray-600"
+        }`}
+      >
+        {darkMode ? (
+          <Sun className="w-[16px] h-[16px]" />
+        ) : (
+          <Moon className="w-[16px] h-[16px]" />
+        )}
+      </button>
+    </header>
+  );
+}
+
+export function BottomNav({
+  active,
+  onNavigate,
+  darkMode,
+  hasChat,
+}: Omit<NavComponentProps, "onToggleDark">) {
+  return (
+    <nav
+      className={`md:hidden flex items-center justify-around h-16 border-t flex-shrink-0 ${
+        darkMode
+          ? "bg-gray-900 border-gray-800"
+          : "bg-white border-gray-200"
+      }`}
+    >
+      {NAV_ITEMS.map(({ key, label, Icon }) => {
+        const isActive = active === key;
+        const isDisabled = key === "chat" && !hasChat;
+        return (
+          <button
+            key={key}
+            onClick={() => !isDisabled && onNavigate(key)}
+            disabled={isDisabled}
+            className={`flex flex-col items-center justify-center min-w-[44px] min-h-[44px] px-2 transition-all ${
+              isActive
+                ? "text-blue-500"
+                : isDisabled
+                  ? "opacity-30"
+                  : darkMode
+                    ? "text-gray-500"
+                    : "text-gray-400"
+            }`}
+          >
+            <Icon className="w-5 h-5" />
+            <span className="text-[10px] mt-1 font-medium">{label}</span>
+          </button>
+        );
+      })}
     </nav>
   );
 }

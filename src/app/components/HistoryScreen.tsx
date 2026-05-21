@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileText, Download, AlertTriangle, Phone, Trash2, ChevronRight, Calendar, Pill, Shield } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { api } from "../../lib/api";
 
 interface HistoryEntry {
   id: string;
@@ -11,20 +12,13 @@ interface HistoryEntry {
   severity: "mild" | "moderate" | "severe";
 }
 
-const HISTORY: HistoryEntry[] = [
-  { id: "1", date: "May 19, 2026", symptom: "Headache with nausea", medicine: "Paracetamol 500mg", resolved: true, severity: "mild" },
-  { id: "2", date: "May 15, 2026", symptom: "Seasonal allergies, sneezing", medicine: "Cetirizine 10mg", resolved: true, severity: "mild" },
-  { id: "3", date: "May 10, 2026", symptom: "Dry cough, sore throat", medicine: "Dextromethorphan Syrup", resolved: true, severity: "moderate" },
-  { id: "4", date: "May 4, 2026", symptom: "Stomach cramps, bloating", medicine: "Buscopan 10mg", resolved: true, severity: "mild" },
-  { id: "5", date: "Apr 28, 2026", symptom: "Fever 38.5°C, body aches", medicine: "Ibuprofen 400mg", resolved: true, severity: "moderate" },
-  { id: "6", date: "Apr 14, 2026", symptom: "Back pain, muscle stiffness", medicine: "Ibuprofen 400mg + Muscle Relaxant", resolved: true, severity: "moderate" },
-];
-
-const SAVED_MEDS = [
-  { name: "Cetirizine 10mg", use: "Seasonal allergies", icon: "🌿", stock: "14 tablets left" },
-  { name: "Paracetamol 500mg", use: "Headache & fever", icon: "🔵", stock: "30 tablets left" },
-  { name: "Ibuprofen 400mg", use: "Pain & inflammation", icon: "💊", stock: "8 tablets left" },
-];
+interface SavedMed {
+  id: string;
+  name: string;
+  use: string;
+  icon: string;
+  stock: string;
+}
 
 const SEVERITY_CONFIG = {
   mild: { color: "text-green-600", bg: "bg-green-50", darkBg: "bg-green-900/30", darkColor: "text-green-400", dot: "bg-green-400" },
@@ -38,8 +32,37 @@ interface HistoryScreenProps {
 
 export function HistoryScreen({ darkMode }: HistoryScreenProps) {
   const [activeTab, setActiveTab] = useState<"history" | "saved" | "settings">("history");
-  const [entries, setEntries] = useState(HISTORY);
+  const [entries, setEntries] = useState<HistoryEntry[]>([]);
+  const [savedMeds, setSavedMeds] = useState<SavedMed[]>([]);
   const [showExportSuccess, setShowExportSuccess] = useState(false);
+
+  useEffect(() => {
+    api.history.list().then((rows) => {
+      setEntries(rows.map((r: any) => ({
+        id: String(r.id),
+        date: new Date(r.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        symptom: r.symptom,
+        medicine: r.medicine,
+        resolved: !!r.resolved,
+        severity: r.severity || "mild",
+      })));
+    }).catch(() => {});
+
+    api.savedMeds.list().then((rows) => {
+      setSavedMeds(rows.map((r: any) => ({
+        id: String(r.id),
+        name: r.name,
+        use: r.use || "",
+        icon: r.icon || "💊",
+        stock: r.stock || "",
+      })));
+    }).catch(() => {});
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    await api.history.remove(id);
+    setEntries((prev) => prev.filter((e) => e.id !== id));
+  };
 
   const handleExport = () => {
     setShowExportSuccess(true);
@@ -125,7 +148,7 @@ export function HistoryScreen({ darkMode }: HistoryScreenProps) {
                     </div>
                     <div className="flex items-center gap-1">
                       <span className={`px-2 py-0.5 rounded-full text-xs ${darkMode ? sev.darkBg + " " + sev.darkColor : sev.bg + " " + sev.color}`}>{entry.severity}</span>
-                      <button onClick={() => setEntries((prev) => prev.filter((e) => e.id !== entry.id))}
+                      <button onClick={() => handleDelete(entry.id)}
                         className={`w-7 h-7 rounded-lg flex items-center justify-center ${darkMode ? "text-gray-600 hover:bg-gray-700" : "text-gray-400 hover:bg-gray-50"}`}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -157,7 +180,7 @@ export function HistoryScreen({ darkMode }: HistoryScreenProps) {
 
         {activeTab === "saved" && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {SAVED_MEDS.map((med, i) => (
+            {savedMeds.map((med, i) => (
               <motion.div key={med.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                 className={`rounded-2xl p-4 flex items-center gap-3 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-100 shadow-sm"}`}>
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${darkMode ? "bg-blue-900/30" : "bg-blue-50"}`}>

@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { MapPin, Clock, Navigation, Share2, Star, Phone } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MapPin, Clock, Navigation, Share2, Star, Phone, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
+import { api } from "../../lib/api";
 
 interface Pharmacy {
   id: string;
@@ -15,15 +16,14 @@ interface Pharmacy {
   phone: string;
   otcAvailable: boolean;
   prescriptionAvailable: boolean;
+  lat: number;
+  lng: number;
 }
 
-const PHARMACIES: Pharmacy[] = [
-  { id: "1", name: "MediCare Pharmacy", type: "pharmacy", distance: "0.3 km", address: "12 Health Street, Central", isOpen: true, closingTime: "10:00 PM", rating: 4.8, services: ["Prescription filling", "24h service", "Home delivery"], phone: "+1-555-0101", otcAvailable: true, prescriptionAvailable: true },
-  { id: "2", name: "City Health Clinic", type: "clinic", distance: "0.7 km", address: "45 Wellness Ave, Downtown", isOpen: true, closingTime: "8:00 PM", rating: 4.6, services: ["Doctor consultation", "Prescription writing", "Lab tests"], phone: "+1-555-0102", otcAvailable: false, prescriptionAvailable: true },
-  { id: "3", name: "QuickMeds Express", type: "pharmacy", distance: "1.1 km", address: "78 Market Rd, Eastside", isOpen: true, closingTime: "Midnight", rating: 4.4, services: ["Prescription filling", "OTC medicines", "Vitamins"], phone: "+1-555-0103", otcAvailable: true, prescriptionAvailable: true },
-  { id: "4", name: "WellCare Medical Center", type: "clinic", distance: "1.5 km", address: "23 Care Lane, Westfield", isOpen: false, closingTime: "Opens at 8:00 AM", rating: 4.9, services: ["Doctor consultation", "Specialist referrals", "Emergency care"], phone: "+1-555-0104", otcAvailable: false, prescriptionAvailable: true },
-  { id: "5", name: "NightOwl Pharmacy", type: "pharmacy", distance: "2.0 km", address: "56 Night Street, Northside", isOpen: true, closingTime: "24 hours", rating: 4.3, services: ["24h service", "Prescription filling", "Emergency meds"], phone: "+1-555-0105", otcAvailable: true, prescriptionAvailable: true },
-  { id: "6", name: "GreenLeaf Wellness", type: "clinic", distance: "2.3 km", address: "90 Holistic Blvd, Midtown", isOpen: true, closingTime: "7:00 PM", rating: 4.7, services: ["Doctor consultation", "Vaccination", "Blood tests"], phone: "+1-555-0106", otcAvailable: false, prescriptionAvailable: true },
+const FALLBACK_PHARMACIES: Pharmacy[] = [
+  { id: "1", name: "MediCare Pharmacy", type: "pharmacy", distance: "0.3 km", address: "12 Health Street, Central", isOpen: true, closingTime: "10:00 PM", rating: 4.8, services: ["Prescription filling", "24h service", "Home delivery"], phone: "+1-555-0101", otcAvailable: true, prescriptionAvailable: true, lat: 0, lng: 0 },
+  { id: "2", name: "City Health Clinic", type: "clinic", distance: "0.7 km", address: "45 Wellness Ave, Downtown", isOpen: true, closingTime: "8:00 PM", rating: 4.6, services: ["Doctor consultation", "Prescription writing", "Lab tests"], phone: "+1-555-0102", otcAvailable: false, prescriptionAvailable: true, lat: 0, lng: 0 },
+  { id: "3", name: "QuickMeds Express", type: "pharmacy", distance: "1.1 km", address: "78 Market Rd, Eastside", isOpen: true, closingTime: "Midnight", rating: 4.4, services: ["Prescription filling", "OTC medicines", "Vitamins"], phone: "+1-555-0103", otcAvailable: true, prescriptionAvailable: true, lat: 0, lng: 0 },
 ];
 
 const SERVICE_COLORS: Record<string, string> = {
@@ -89,8 +89,57 @@ interface PharmacyScreenProps {
 
 export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
   const [activeTab, setActiveTab] = useState<"otc" | "prescription">("otc");
+  const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const filtered = PHARMACIES.filter((p) => activeTab === "otc" ? p.otcAvailable : p.prescriptionAvailable);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchPharmacies() {
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          if (!navigator.geolocation) reject(new Error("Geolocation not supported"));
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+        });
+
+        if (cancelled) return;
+        const { latitude, longitude } = pos.coords;
+        const data = await api.pharmacy.nearby(latitude, longitude);
+
+        if (cancelled) return;
+        const mapped: Pharmacy[] = data.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          type: p.type,
+          distance: p.distance,
+          address: p.address,
+          isOpen: p.isOpen,
+          closingTime: "N/A",
+          rating: 0,
+          services: [],
+          phone: p.phone,
+          otcAvailable: p.type === "pharmacy",
+          prescriptionAvailable: true,
+          lat: p.lat,
+          lng: p.lng,
+        }));
+        setPharmacies(mapped.length > 0 ? mapped : FALLBACK_PHARMACIES);
+      } catch {
+        if (!cancelled) {
+          setPharmacies(FALLBACK_PHARMACIES);
+          setError("Using sample data — location access needed for nearby results");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetchPharmacies();
+    return () => { cancelled = true; };
+  }, []);
+
+  const filtered = pharmacies.filter((p) => activeTab === "otc" ? p.otcAvailable : p.prescriptionAvailable);
 
   return (
     <div className={`${darkMode ? "bg-gray-950" : "bg-gray-50"}`}>
@@ -99,7 +148,12 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
         {/* Page header */}
         <div className="mb-6">
           <h2 className={`${darkMode ? "text-white" : "text-gray-900"}`} style={{ fontSize: "24px", fontWeight: 700 }}>Find Nearby</h2>
-          <p className={`${darkMode ? "text-gray-400" : "text-gray-500"}`} style={{ fontSize: "14px" }}>Pharmacies and clinics near your location</p>
+          <p className={`${darkMode ? "text-gray-400" : "text-gray-500"}`} style={{ fontSize: "14px" }}>
+            {loading ? "Searching nearby pharmacies..." : "Pharmacies and clinics near your location"}
+          </p>
+          {error && (
+            <p className="mt-1 text-xs text-amber-500">{error}</p>
+          )}
         </div>
 
         <div className="grid lg:grid-cols-5 gap-6">
@@ -148,7 +202,12 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
             </div>
 
             <div className="space-y-3">
-              {filtered.map((pharmacy, i) => (
+              {loading && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+                </div>
+              )}
+              {!loading && filtered.map((pharmacy, i) => (
                 <motion.div key={pharmacy.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
                   className={`rounded-2xl overflow-hidden ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-100 shadow-sm"}`}>
                   <div className="p-4">

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Mic, Phone, ChevronDown, ChevronUp, AlertTriangle, Bookmark, BookmarkCheck, MapPin } from "lucide-react";
+import { Send, Phone, ChevronDown, ChevronUp, AlertTriangle, Bookmark, BookmarkCheck, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { api } from "../../lib/api";
 
 interface MedicineCard {
   name: string;
@@ -237,25 +238,19 @@ export function ChatScreen({ initialSymptom, darkMode, onNavigateToPharmacy }: C
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  const getMockResponse = (symptom: string) => {
-    const key = Object.keys(MOCK_RESPONSES).find((k) => symptom.toLowerCase().includes(k.toLowerCase()));
-    const medicine = key ? MOCK_RESPONSES[key] : MOCK_RESPONSES.default;
-    return {
-      ack: `I understand you're experiencing **${symptom.toLowerCase()}**. Based on your symptoms, I've reviewed our pharmaceutical database and have a recommendation that may help provide relief. Please review the information below carefully.`,
-      medicine,
-    };
-  };
-
-  const sendMessage = (text: string, _isInitial = false) => {
+  const sendMessage = async (text: string, _isInitial = false) => {
     const userMsg: Message = { id: Date.now().toString(), role: "user", text, timestamp: new Date() };
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
     setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      const { ack, medicine } = getMockResponse(text);
+    try {
+      const { ack, medicine } = await api.chat.send(text);
       setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: "bot", symptomAck: ack, medicine, timestamp: new Date() }]);
-    }, 2200);
+    } catch {
+      setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: "bot", text: "Sorry, something went wrong. Please try again.", timestamp: new Date() }]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const toggleSave = (medName: string) => {
@@ -352,7 +347,6 @@ export function ChatScreen({ initialSymptom, darkMode, onNavigateToPharmacy }: C
               className={`flex-1 resize-none outline-none bg-transparent max-h-24 ${darkMode ? "text-white placeholder-gray-500" : "text-gray-800 placeholder-gray-400"}`}
               style={{ fontSize: "16px" }} rows={1}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (inputValue.trim()) sendMessage(inputValue.trim()); } }} />
-            <Mic className={`w-5 h-5 ml-2 flex-shrink-0 ${darkMode ? "text-gray-500" : "text-gray-400"}`} />
           </div>
           <button onClick={() => inputValue.trim() && sendMessage(inputValue.trim())}
             disabled={!inputValue.trim() || isTyping}
