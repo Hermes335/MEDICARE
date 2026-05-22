@@ -208,11 +208,11 @@ Run all cells top-to-bottom. The notebook will produce every artifact automatica
 | Section | What It Does | Time |
 |---------|-------------|------|
 | 0–2 | Setup, DB load, preprocessing demo | ~2 min |
-| 3 | Build pharmacare-dataset corpus (~1,600 examples) | ~2 min |
+| 3 | Build pharmacare-dataset corpus (~2,179 examples) | ~2 min |
 | 4 | Train classifiers (fast) | ~2 min |
 | 5 | Train Word2Vec (fast) | ~2 min |
 | 6 | BM25 demo (fast) | ~1 min |
-| 7 | **QLoRA fine-tuning** | ~30–40 min on RTX 4050 |
+| 7 | **QLoRA fine-tuning** | ~45–55 min on RTX 4050 |
 | 8 | Metrics (fast) | ~1 min |
 | 9 | Inference demo (loads model) | ~1 min |
 | 10 | Gradio UI (optional) | — |
@@ -323,7 +323,7 @@ Pharmacare-PH/
 |
 |-- data/                           # All datasets (tracked in Git)
 |   |-- ph_drug_database.jsonl      # Master drug reference (80 drugs)
-|   |-- pharma_qa_pairs.jsonl       # LLM training corpus (~1,600 examples)
+|   |-- pharma_qa_pairs.jsonl       # LLM training corpus (~2,179 examples)
 |   |-- classifier_training_data.jsonl  # Parallel classifier labels
 |
 |-- models/                         # All trained artifacts (tracked in Git)

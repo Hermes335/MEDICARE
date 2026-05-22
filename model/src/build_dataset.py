@@ -56,8 +56,8 @@ INTENT_CLASSES = [
     "price_availability_ph", "emergency_escalation",
 ]
 
-TARGET_PER_INTENT = 250
-MAX_TOTAL = 2000
+TARGET_PER_INTENT = 320
+MAX_TOTAL = 2600
 
 # ------------------------------------------------------------------------------
 # SYSTEM / DISCLAIMER
@@ -653,6 +653,10 @@ _QUERY_TEMPLATES = {
             "I have {symptom}. What can I buy at the pharmacy without a prescription?",
             "Best over-the-counter medicine for {symptom} in the Philippines?",
             "My friend has {symptom}. What OTC medicine do you recommend?",
+            "Is there a safe OTC option for {symptom}?",
+            "What do you suggest for {symptom} that I can get at the drugstore?",
+            "Cheap and effective OTC medicine for {symptom}?",
+            "What can relieve {symptom} without a doctor's prescription?",
         ],
         "tl": [
             "Anong over-the-counter na gamot ang pwede sa {symptom}?",
@@ -660,6 +664,10 @@ _QUERY_TEMPLATES = {
             "May {symptom} ako. Ano ang recommended na OTC na gamot?",
             "Anong gamot para sa {symptom} ang pwedeng bilhin sa Mercury Drug?",
             "May {symptom} ang kaibigan ko. Anong OTC na gamot ang ire-recommend mo?",
+            "May safe bang OTC na option para sa {symptom}?",
+            "Ano ang mura at effective na gamot para sa {symptom}?",
+            "Ano ang mabibili ko sa botika para sa {symptom} nang walang reseta?",
+            "Anong pwedeng pain reliever para sa {symptom}?",
         ],
     },
     "drug_info_general": {
@@ -668,12 +676,20 @@ _QUERY_TEMPLATES = {
             "Tell me about {drug_name}.",
             "What is {drug_name} and can I buy it without a prescription?",
             "Is {drug_name} available over the counter in the Philippines?",
+            "What class of drug is {drug_name}?",
+            "Can you explain what {drug_name} does in the body?",
+            "Is {drug_name} safe for pregnant women?",
+            "What are the indications for {drug_name}?",
         ],
         "tl": [
             "Ano ang {drug_name} at para saan ito?",
             "Magbigay ng impormasyon tungkol sa {drug_name}.",
             "Ano ang {drug_name} at pwede bang bilhin nang walang reseta?",
             "Over-the-counter ba ang {drug_name} sa Pilipinas?",
+            "Anong klase ng gamot ang {drug_name}?",
+            "Pwedeng ipaliwanag kung ano ang ginagawa ng {drug_name} sa katawan?",
+            "Safe ba ang {drug_name} para sa buntis?",
+            "Ano ang mga indications ng {drug_name}?",
         ],
     },
     "side_effects": {
@@ -681,11 +697,19 @@ _QUERY_TEMPLATES = {
             "What are the common side effects of {drug_name}?",
             "Are there adverse reactions from {drug_name}?",
             "What side effects should I watch out for with {drug_name}?",
+            "Does {drug_name} cause dizziness or nausea?",
+            "What are the serious side effects of {drug_name}?",
+            "Can {drug_name} cause allergic reactions?",
+            "Any long-term side effects I should know about {drug_name}?",
         ],
         "tl": [
             "Ano ang mga karaniwang side effects ng {drug_name}?",
             "May adverse reactions ba ang {drug_name}?",
             "Anong side effects ang dapat bantayan sa {drug_name}?",
+            "Nagdudulot ba ng hilo o pagkahilo ang {drug_name}?",
+            "Ano ang mga seryosong side effects ng {drug_name}?",
+            "Pwedeng magcause ng allergic reaction ang {drug_name}?",
+            "May long-term side effects ba ang {drug_name} na dapat kong malaman?",
         ],
     },
     "intake_schedule": {
@@ -693,11 +717,19 @@ _QUERY_TEMPLATES = {
             "How do I take {drug_name}?",
             "What is the standard adult dosage for {drug_name}?",
             "When should I take {drug_name} and how often?",
+            "Should {drug_name} be taken before or after meals?",
+            "What happens if I miss a dose of {drug_name}?",
+            "Can I take {drug_name} with alcohol?",
+            "Is it okay to take {drug_name} on an empty stomach?",
         ],
         "tl": [
             "Paano inumin ang {drug_name}?",
             "Ano ang tamang dosage ng {drug_name}?",
             "Kailan ko dapat inumin ang {drug_name} at gaano kadalas?",
+            "Dapat bang inumin ang {drug_name} bago o pagkatapos kumain?",
+            "Ano ang mangyayari kung hindi ko nainom ang {drug_name}?",
+            "Pwede bang uminom ng {drug_name} kasabay ng alak?",
+            "Pwede bang inumin ang {drug_name} sa walang laman ang tiyan?",
         ],
     },
     "drug_interaction": {
@@ -705,11 +737,19 @@ _QUERY_TEMPLATES = {
             "Can I take {drug_a} and {drug_b} together safely?",
             "Is it safe to combine {drug_a} and {drug_b}?",
             "What happens if I take {drug_a} and {drug_b} at the same time?",
+            "Will {drug_a} interact with {drug_b}?",
+            "Are there any known drug interactions between {drug_a} and {drug_b}?",
+            "I am taking {drug_a}, can I also take {drug_b}?",
+            "Any food or alcohol I should avoid while taking {drug_a} and {drug_b}?",
         ],
         "tl": [
             "Pwede bang pagsabayin ang {drug_a} at {drug_b}?",
             "Safe ba ang {drug_a} at {drug_b} na inumin magkasama?",
             "May interaction ba kung pagkakasabayin ko ang {drug_a} at {drug_b}?",
+            "May interaction ba ang {drug_a} at {drug_b}?",
+            "May kilalang drug interaction ba sa pagitan ng {drug_a} at {drug_b}?",
+            "Umiinom ako ng {drug_a}, pwede ko bang inumin din ang {drug_b}?",
+            "May pagkaing o alak ba na dapat iwasan habang umiinom ng {drug_a} at {drug_b}?",
         ],
     },
     "rx_info_restricted": {
@@ -717,11 +757,19 @@ _QUERY_TEMPLATES = {
             "Why is {drug_name} a prescription-only medicine in the Philippines?",
             "What is {drug_name} and why does it require a doctor's prescription?",
             "Tell me about {drug_name}, a prescription drug that needs a reseta.",
+            "Can I buy {drug_name} without a prescription online?",
+            "What are the risks of using {drug_name} without a doctor's advice?",
+            "Is {drug_name} restricted because it is habit-forming?",
+            "What conditions is {drug_name} used for?",
         ],
         "tl": [
             "Bakit prescription-only ang {drug_name} sa Pilipinas?",
             "Ano ang {drug_name} at bakit kailangan ng reseta ng doktor?",
             "Para saan ang prescription na gamot na {drug_name}?",
+            "Pwede bang bumili ng {drug_name} nang walang reseta online?",
+            "Ano ang mga panganib ng paggamit ng {drug_name} nang walang payo ng doktor?",
+            "Restricted ba ang {drug_name} dahil nakaka-addict?",
+            "Anong mga kondisyon ang ginagamot ng {drug_name}?",
         ],
     },
     "price_availability_ph": {
@@ -729,11 +777,19 @@ _QUERY_TEMPLATES = {
             "How much is {drug_name} at the pharmacy?",
             "What is the price of {drug_name} in the Philippines?",
             "Where can I buy {drug_name} and how much does it cost?",
+            "Is there a generic version of {drug_name} available?",
+            "How much is the branded version of {drug_name} compared to generic?",
+            "Can I find {drug_name} in Watsons or Mercury Drug?",
+            "Is {drug_name} covered by PhilHealth or any HMO?",
         ],
         "tl": [
             "Magkano ang {drug_name} sa pharmacy?",
             "Ano ang presyo ng {drug_name} sa Pilipinas?",
             "Saan pwedeng bumili ng {drug_name} at magkano ito?",
+            "May generic version ba ng {drug_name}?",
+            "Magkano ang branded na {drug_name} kumpara sa generic?",
+            "Makikita ba ang {drug_name} sa Watsons o Mercury Drug?",
+            "Covered ba ng PhilHealth o HMO ang {drug_name}?",
         ],
     },
     "emergency_escalation": {
@@ -746,6 +802,13 @@ _QUERY_TEMPLATES = {
             "Severe bleeding from a wound that won't stop.",
             "Overdose on medication -- feeling very dizzy.",
             "Stroke symptoms: face drooping, arm weakness, speech difficulty.",
+            "My baby is having a seizure!",
+            "I was bitten by a snake, swelling rapidly.",
+            "Severe burn on my arm -- skin is peeling off.",
+            "Head injury from a fall -- vomiting and confused.",
+            "Anaphylaxis after eating shellfish -- throat closing.",
+            "Suicidal thoughts -- I need help immediately.",
+            "Poisoning -- accidentally drank cleaning solution.",
         ],
         "tl": [
             "Hindi ako makahinga at masakit ang dibdib ko.",
@@ -756,6 +819,13 @@ _QUERY_TEMPLATES = {
             "Matinding dugo na hindi tumitigil.",
             "Overdose sa gamot -- sobrang hilo.",
             "Sintomas ng stroke: nanlambot ang mukha, mahina ang braso, hirap magsalita.",
+            "Nagkaseizure ang baby ko!",
+            "Nakagat ako ng ahas, mabilis ang pamamaga.",
+            "Matinding sunog sa braso -- nabubuwal ang balat.",
+            "Sugat sa ulo mula sa pagkadulas -- nasusuka at nalilito.",
+            "Anaphylaxis pagkatapos kumain ng shellfish -- sumasara ang lalamunan.",
+            "Naisip na magpakamatay -- kailangan ko ng tulong agad.",
+            "Pagkalason -- aksidenteng nainom ang cleaning solution.",
         ],
     },
 }
@@ -862,6 +932,69 @@ _SYMPTOM_MAP: Dict[str, List[str]] = {
     "Mebendazole": ["pinworm", "roundworm"],
     "Zinc Oxide (topical)": ["diaper rash", "minor skin irritations"],
     "Sodium Chloride Nasal Spray": ["nasal congestion", "dry nose"],
+    "Paracetamol + Caffeine": ["headache", "migraine", "fever", "body pain"],
+    "Iron Supplements (Ferrous Sulfate)": ["anemia", "fatigue", "pallor", "weakness"],
+    "Folic Acid": ["folate deficiency", "pregnancy supplementation", "anemia"],
+    "Vitamin B Complex": ["nerve pain", "neuropathy", "fatigue", "poor appetite", "mouth sores"],
+    "Hydrocortisone + Miconazole (topical)": ["fungal skin infection", "athlete's foot with redness", "jock itch"],
+    "Permethrin (topical)": ["scabies", "head lice", "body lice"],
+    "Chloramphenicol (eye drops)": ["bacterial conjunctivitis", "eye infection", "sore eyes"],
+    "Carboxymethylcellulose (eye drops)": ["dry eyes", "eye irritation", "computer vision syndrome"],
+    "Lactulose": ["constipation", "chronic constipation"],
+    "Sucralfate": ["gastric ulcer", "duodenal ulcer", "acid reflux"],
+    "Amoxicillin": ["respiratory infection", "UTI", "skin infection", "ear infection"],
+    "Azithromycin": ["respiratory infection", "skin infection", "typhoid fever"],
+    "Cefalexin": ["respiratory infection", "skin infection", "UTI"],
+    "Amoxicillin-Clavulanate": ["sinusitis", "respiratory infection", "skin infection"],
+    "Metformin": ["Type 2 Diabetes", "high blood sugar", "PCOS"],
+    "Amlodipine": ["high blood pressure", "hypertension", "chest pain"],
+    "Losartan": ["high blood pressure", "hypertension", "diabetic kidney disease"],
+    "Atorvastatin": ["high cholesterol", "dyslipidemia"],
+    "Salbutamol": ["asthma", "wheezing", "difficulty breathing", "bronchospasm"],
+    "Montelukast": ["asthma", "allergic rhinitis", "wheezing"],
+    "Fluoxetine": ["depression", "anxiety", "OCD", "panic disorder"],
+    "Sertraline": ["depression", "anxiety", "panic disorder", "PTSD"],
+    "Escitalopram": ["depression", "anxiety"],
+    "Quetiapine": ["bipolar disorder", "schizophrenia"],
+    "Lorazepam": ["anxiety", "insomnia", "panic attack"],
+    "Ondansetron": ["nausea", "vomiting", "motion sickness"],
+    "Domperidone": ["nausea", "vomiting", "bloating", "indigestion"],
+    "Allopurinol": ["gout", "joint pain", "high uric acid"],
+    "Colchicine": ["gout attack", "acute gout", "joint swelling"],
+    "Propranolol": ["high blood pressure", "palpitations", "migraine", "tremor"],
+    "Digoxin": ["heart failure", "irregular heartbeat"],
+    "Spironolactone": ["heart failure", "swelling", "edema", "ascites"],
+    "Levothyroxine": ["hypothyroidism", "low thyroid", "tiredness", "weight gain"],
+    "Clarithromycin": ["respiratory infection", "H. pylori", "stomach ulcer"],
+    "Cefuroxime": ["respiratory infection", "sinusitis", "UTI", "Lyme disease"],
+    "Cotrimoxazole": ["UTI", "traveler's diarrhea", "respiratory infection"],
+    "Fluconazole": ["vaginal yeast infection", "oral thrush", "fungal infection"],
+    "Carbamazepine": ["epilepsy", "seizures", "trigeminal neuralgia", "nerve pain"],
+    "Valproic Acid": ["epilepsy", "seizures", "bipolar disorder", "migraine"],
+    "Salmeterol + Fluticasone": ["asthma", "COPD", "wheezing"],
+    "Budesonide": ["asthma", "COPD", "wheezing"],
+    "Gliclazide": ["Type 2 Diabetes", "high blood sugar"],
+    "Sitagliptin": ["Type 2 Diabetes", "high blood sugar"],
+    "Insulin Glargine": ["Type 1 Diabetes", "Type 2 Diabetes", "high blood sugar"],
+    "Captopril": ["high blood pressure", "heart failure", "kidney disease"],
+    "Enalapril": ["high blood pressure", "heart failure"],
+    "Valsartan": ["high blood pressure", "heart failure"],
+    "Hydrochlorothiazide": ["high blood pressure", "swelling", "edema"],
+    "Simvastatin": ["high cholesterol", "dyslipidemia"],
+    "Rosuvastatin": ["high cholesterol", "dyslipidemia"],
+    "Prednisone": ["inflammatory conditions", "allergic reactions", "asthma exacerbation", "autoimmune disorders"],
+    "Methylprednisolone": ["inflammatory conditions", "allergic reactions", "asthma exacerbation"],
+    "Erythromycin": ["respiratory infection", "skin infection", "gastroparesis"],
+    "Metronidazole": ["bacterial vaginosis", "amebiasis", "giardiasis", "dental infection"],
+    "Doxycycline": ["respiratory infection", "skin infection", "acne", "UTI"],
+    "Ceftriaxone": ["severe infection", "meningitis", "pneumonia", "sepsis"],
+    "Pantoprazole": ["acid reflux", "GERD", "peptic ulcer", "Zollinger-Ellison syndrome"],
+    "Glimepiride": ["Type 2 Diabetes", "high blood sugar"],
+    "Tramadol": ["moderate to severe pain", "post-operative pain", "chronic pain"],
+    "Diclofenac": ["pain", "inflammation", "arthritis", "dysmenorrhea", "muscle sprain"],
+    "Hydrocortisone (topical)": ["skin rash", "insect bites", "eczema", "mild dermatitis"],
+    "Clotrimazole (topical/oral)": ["athlete's foot", "jock itch", "ringworm", "vaginal yeast infection"],
+    "Miconazole (topical)": ["athlete's foot", "ringworm", "oral thrush"],
 }
 
 
@@ -878,9 +1011,12 @@ def generate_examples(records: List[Dict], intent: str, needed: int) -> List[Dic
     rx_records = [r for r in records if r["rx_status"] == "Rx"]
     all_records = records
 
-    # Pre-compute symptom-to-drug reverse map
+    # Pre-compute symptom-to-drug reverse map (only for drugs present in records)
+    otc_names = {r["generic_name"] for r in otc_records}
     symptom_to_drugs: Dict[str, List[str]] = {}
     for drug_name, symptoms in _SYMPTOM_MAP.items():
+        if drug_name not in otc_names:
+            continue
         for symptom in symptoms:
             symptom_to_drugs.setdefault(symptom, []).append(drug_name)
 
@@ -1023,7 +1159,7 @@ def deduplicate(examples: List[Dict]) -> List[Dict]:
 # FULL PIPELINE ENTRY POINT
 # ------------------------------------------------------------------------------
 def build_datasets(output_qa: str = "data/pharma_qa_pairs.jsonl",
-                   output_clf: str = "data/classifier_training_data.jsonl") -> None:
+                   output_clf: str = "data/classifier_training_data.jsonl") -> Dict[str, Any]:
     import os
     os.makedirs("data", exist_ok=True)
 
@@ -1068,6 +1204,8 @@ def build_datasets(output_qa: str = "data/pharma_qa_pairs.jsonl",
         for ex in classifier_examples:
             f.write(json.dumps(ex, ensure_ascii=False) + "\n")
     print(f"[EXPORT] pharmacare-dataset classifier labels -> {output_clf}")
+
+    return {"qa_pairs": all_examples, "classifier_data": classifier_examples}
 
 
 if __name__ == "__main__":

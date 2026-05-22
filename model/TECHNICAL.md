@@ -63,11 +63,11 @@
 |-----------|-------|
 | **Source** | Generated from the master drug reference via `src/build_dataset.py` |
 | **Method** | 5-stage pipeline (Ingest → Extract → Process → Augment → Export) |
-| **Size** | ~1,600 deduplicated examples across 8 intent classes |
+| **Size** | ~2,179 deduplicated examples across 8 intent classes (320 per intent target, ~140 drug records)
 | **Format** | TinyLlama chat template (`<|system|>`, `<|user|>`, `<|assistant|>`, `</s>`) |
 
 **What to say in defense:**
-> "Our drug reference was compiled from publicly available Philippine pharmaceutical sources — the FDA-PH drug registry, major pharmacy catalogs (Mercury Drug, Rose Pharmacy, The Generics Pharmacy), and standard pharmaceutical references — supplemented by field-mapped data from Hugging Face medical Q/A datasets (openlifescienceai/medical-qa and bigbio/pubmed_qa). We processed 80 drugs with their generic names, local brand names, approximate prices, indications, dosages, side effects, and contraindications. The Q/A training corpus was then generated from this multi-source structured reference."
+> "Our drug reference was compiled from publicly available Philippine pharmaceutical sources — the FDA-PH drug registry, major pharmacy catalogs (Mercury Drug, Rose Pharmacy, The Generics Pharmacy), and standard pharmaceutical references — supplemented by field-mapped data from Hugging Face medical Q/A datasets (openlifescienceai/medical-qa and bigbio/pubmed_qa). We processed 140 drugs with their generic names, local brand names, approximate prices, indications, dosages, side effects, and contraindications. The Q/A training corpus was then generated from this multi-source structured reference."
 
 ### 1.3 Hugging Face Dataset Integration
 
@@ -125,7 +125,7 @@ These datasets were processed in **streaming mode** to minimize disk usage. Thei
 
 #### QLoRA over Full Fine-Tuning
 - **Why not full fine-tuning?** TinyLlama-1.1B has ~1.1 billion parameters. Full fine-tuning would require ~22 GB VRAM (FP16). QLoRA uses 4-bit quantization + LoRA adapters, fitting in ~5.5 GB VRAM.
-- **Why r=8, alpha=16?** This is the standard "rule of thumb" (alpha = 2*r). For a 1.1B model on a small domain corpus (~1,600 examples), rank 8 is sufficient. Higher ranks risk overfitting.
+- **Why r=8, alpha=16?** This is the standard "rule of thumb" (alpha = 2*r). For a 1.1B model on a small domain corpus (~2,179 examples), rank 8 is sufficient. Higher ranks risk overfitting.
 
 ---
 
@@ -212,7 +212,7 @@ These datasets were processed in **streaming mode** to minimize disk usage. Thei
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
-| Epochs | 3 | Sufficient for domain adaptation on ~1,600 examples |
+| Epochs | 3 | Sufficient for domain adaptation on ~2,179 examples |
 | Batch size | 1 | VRAM constraint |
 | Gradient accumulation | 2 | Effective batch = 2 |
 | Learning rate | 2.0e-4 | Standard for LoRA fine-tuning |
@@ -290,7 +290,7 @@ These datasets were processed in **streaming mode** to minimize disk usage. Thei
 | Metric | Value |
 |--------|-------|
 | Final training loss | ~1.8 (checkpoint-2157) |
-| Training time | ~35 minutes on RTX 4050 |
+| Training time | ~45–55 minutes on RTX 4050 |
 | VRAM usage | ~5.5 GB peak |
 | Perplexity | Can be computed via `compute_perplexity()` helper |
 
@@ -455,7 +455,7 @@ The `response` is a human-readable Markdown string with **bold labels**. Empty o
 ## 10. Defense Talking Points
 
 ### Q: "Where did your data come from?"
-> "Our drug reference was compiled from publicly available Philippine pharmaceutical sources: the FDA-PH drug registry, major pharmacy catalogs (Mercury Drug, Rose Pharmacy, Generics Pharmacy), and standard pharmaceutical references. We manually processed 80 drugs with their generic names, local brand names, approximate prices, indications, dosages, side effects, and contraindications. The Q/A training corpus was then generated from this structured reference through a 5-stage pipeline — no external medical Q/A datasets were downloaded or used."
+> "Our drug reference was compiled from publicly available Philippine pharmaceutical sources: the FDA-PH drug registry, major pharmacy catalogs (Mercury Drug, Rose Pharmacy, Generics Pharmacy), and standard pharmaceutical references. We manually processed 140 drugs with their generic names, local brand names, approximate prices, indications, dosages, side effects, and contraindications. The Q/A training corpus was then generated from this structured reference through a 5-stage pipeline — no external medical Q/A datasets were downloaded or used."
 
 ### Q: "Why did you choose TinyLlama over larger models?"
 > "We evaluated TinyLlama-1.1B against Qwen2.5-1.5B. TinyLlama trains in ~35 minutes on our RTX 4050 (6 GB VRAM) versus ~90 minutes for Qwen. It also uses a simpler chat template (`<|system|>`) which reduces tokenization mismatch risk. For a domain-specific chatbot with deterministic retrieval, a 1.1B parameter model is sufficient — the LLM primarily serves as a fallback for out-of-distribution queries."
@@ -495,7 +495,7 @@ The `response` is a human-readable Markdown string with **bold labels**. Empty o
 | Enhancement | Description | Technical Approach |
 |-------------|-------------|-------------------|
 | **Expand Drug DB** | 80 → 200+ drugs | Auto-scrape FDA-PH + pharmacy catalogs; manual verification |
-| **Neural Intent Classifier** | Replace ComplementNB with fine-tuned BERT | DistilBERT-Tagalog or mBERT on ~1,600 labeled examples |
+| **Neural Intent Classifier** | Replace ComplementNB with fine-tuned BERT | DistilBERT-Tagalog or mBERT on ~2,179 labeled examples |
 | **RAG Hybrid** | BM25 + dense retrieval | Add FAISS index over drug record embeddings from pharma Word2Vec |
 | **Voice Interface** | STT/TTS for hands-free use | Whisper STT + Coqui TTS (Filipino voice) |
 | **Mobile App** | React Native/Flutter wrapper | API-first design already supports this |
