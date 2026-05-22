@@ -19,159 +19,168 @@ function formatDistance(km: number): string {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
 }
 
+function parseResults(raw: any[], lat: number, lng: number, radiusKm: number) {
+  const seen = new Set<string>();
+  return raw
+    .filter((el: any) => {
+      if (!el.lat || !el.lon) return false;
+      const key = el.lat + "," + el.lon;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((el: any) => {
+      const elLat = parseFloat(el.lat);
+      const elLng = parseFloat(el.lon);
+      const dist = haversineKm(lat, lng, elLat, elLng);
+      const cls = el.class || "";
+      const typ = el.type || "";
+      const isPharmacy = cls === "pharmacy" || typ === "pharmacy" || typ === "chemist";
+      const isHospital = cls === "hospital" || typ === "hospital";
+      let placeType: "pharmacy" | "clinic" = "pharmacy";
+      if (isHospital || cls === "clinic" || typ === "clinic") placeType = "clinic";
+
+      return {
+        id: String(el.osm_id),
+        name: el.name || "Unknown",
+        type: placeType,
+        distance: formatDistance(dist),
+        distanceKm: dist,
+        address: el.display_name || "Address not available",
+        lat: elLat,
+        lng: elLng,
+        phone: el.extratags?.phone || el.extratags?.["contact:phone"] || "",
+        isOpen: true,
+      };
+    })
+    .filter((p: any) => p.distanceKm <= radiusKm)
+    .sort((a: any, b: any) => a.distanceKm - b.distanceKm)
+    .slice(0, 50);
+}
+
+async function fetchNominatim(url: string): Promise<any[]> {
+  const response = await undiciFetch(url, {
+    headers: { "User-Agent": "MediGuideApp/1.0" },
+  });
+  if (!response.ok) return [];
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
+async function fetchPharmacies(lat: number, lng: number, radiusKm: number): Promise<any[]> {
+  // Search for multiple types in parallel
+  const queries = [
+    "pharmacy",
+    "drugstore",
+    "botica",
+    "hospital",
+    "clinic",
+    "medical+center",
+  ];
+
+  // Overpass API is more accurate for POI searches — try it first
+  const overpassResults = await fetchFromOverpass(lat, lng, radiusKm * 1000);
+  if (overpassResults.length > 0) return overpassResults;
+
+  // Fallback to Nominatim with multiple queries
+  const viewbox = [
+    (lng - radiusKm * 1.5 / 111).toFixed(4),
+    (lat + radiusKm * 1.5 / 111).toFixed(4),
+    (lng + radiusKm * 1.5 / 111).toFixed(4),
+    (lat - radiusKm * 1.5 / 111).toFixed(4),
+  ].join(",");
+
+  const urls = queries.map(
+    (q) =>
+      `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=50&viewbox=${viewbox}&addressdetails=1&extratags=1`
+  );
+
+  const allResults: any[] = [];
+  // Run queries in parallel
+  const settled = await Promise.allSettled(urls.map((url) => fetchNominatim(url)));
+  for (const s of settled) {
+    if (s.status === "fulfilled") allResults.push(...s.value);
+  }
+
+  return allResults;
+}
+
+async function fetchFromOverpass(lat: number, lng: number, radiusM: number): Promise<any[]> {
+  const query = `
+[out:json][timeout:10];
+(
+  node["amenity"="pharmacy"](around:${radiusM},${lat},${lng});
+  node["amenity"="hospital"](around:${radiusM},${lat},${lng});
+  node["amenity"="clinic"](around:${radiusM},${lat},${lng});
+  node["amenity"="doctors"](around:${radiusM},${lat},${lng});
+  way["amenity"="pharmacy"](around:${radiusM},${lat},${lng});
+  way["amenity"="hospital"](around:${radiusM},${lat},${lng});
+  way["amenity"="clinic"](around:${radiusM},${lat},${lng});
+  node["shop"="chemist"](around:${radiusM},${lat},${lng});
+);
+out center body;`;
+
+  try {
+    const response = await undiciFetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `data=${encodeURIComponent(query)}`,
+    });
+
+    if (!response.ok) {
+      process.stderr.write(`[pharmacy] Overpass HTTP ${response.status}\n`);
+      return [];
+    }
+
+    const data: any = await response.json();
+    const elements: any[] = data.elements || [];
+
+    return elements.map((el) => {
+      const tags = el.tags || {};
+      const elLat = el.lat || el.center?.lat;
+      const elLng = el.lon || el.center?.lon;
+      const amenity = tags.amenity || "";
+      const shop = tags.shop || "";
+
+      return {
+        osm_id: el.id,
+        name: tags.name || tags["name:en"] || "Unknown",
+        class: amenity || shop,
+        type: amenity === "pharmacy" || shop === "chemist" ? "pharmacy" : amenity,
+        lat: String(elLat),
+        lon: String(elLng),
+        display_name: [tags.name, tags["addr:street"], tags["addr:housenumber"], tags["addr:city"]]
+          .filter(Boolean)
+          .join(", ") || "Address not available",
+        extratags: {
+          phone: tags.phone || tags["contact:phone"] || "",
+          opening_hours: tags.opening_hours || "",
+        },
+      };
+    });
+  } catch (err: any) {
+    process.stderr.write(`[pharmacy] Overpass failed: ${err.message}\n`);
+    return [];
+  }
+}
+
 router.get("/nearby", async (req: Request, res: Response) => {
   const lat = parseFloat(req.query.lat as string);
   const lng = parseFloat(req.query.lng as string);
-  const radiusKm = parseFloat((req.query.radius as string) || "5");
+  const radiusKm = parseFloat((req.query.radius as string) || "10");
 
   if (isNaN(lat) || isNaN(lng)) {
     return res.status(400).json({ error: "lat and lng query params are required" });
   }
 
   try {
-    const viewbox = [
-      (lng - radiusKm / 111).toFixed(4),
-      (lat + radiusKm / 111).toFixed(4),
-      (lng + radiusKm / 111).toFixed(4),
-      (lat - radiusKm / 111).toFixed(4),
-    ].join(",");
-
-    const nominatimUrl =
-      "https://nominatim.openstreetmap.org/search?q=pharmacy&format=json&limit=20&viewbox=" +
-      viewbox +
-      "&bounded=1";
-
-    process.stderr.write(`[pharmacy] fetching ${nominatimUrl}\n`);
-
-    const response = await undiciFetch(nominatimUrl, {
-      headers: { "User-Agent": "MediGuideApp/1.0" },
-    });
-
-    process.stderr.write(`[pharmacy] response status ${response.status}\n`);
-
-    if (!response.ok) {
-      let bodyText = "";
-      try {
-        bodyText = await response.text();
-      } catch (e: any) {
-        bodyText = `<failed to read response text: ${e?.message || e}>`;
-      }
-      process.stderr.write(`[pharmacy] non-ok response: ${response.status} ${response.statusText} body: ${bodyText}\n`);
-      return res.status(502).json({ error: "Failed to fetch pharmacy data", detail: bodyText });
-    }
-
-    const pharmacies: any[] = await response.json();
-    process.stderr.write(`[pharmacy] got ${pharmacies.length} results\n`);
-
-    const seen = new Set<string>();
-    const results = pharmacies
-      .filter((el: any) => {
-        if (!el.lat || !el.lon) return false;
-        const key = el.lat + "," + el.lon;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .map((el: any) => {
-        const elLat = parseFloat(el.lat);
-        const elLng = parseFloat(el.lon);
-        const dist = haversineKm(lat, lng, elLat, elLng);
-        const isPharmacy = el.type === "pharmacy" || el.class === "pharmacy";
-        return {
-          id: String(el.osm_id),
-          name: el.name || "Unknown",
-          type: isPharmacy ? "pharmacy" : "clinic",
-          distance: formatDistance(dist),
-          distanceKm: dist,
-          address: el.display_name || "Address not available",
-          lat: elLat,
-          lng: elLng,
-          phone: "",
-          isOpen: true,
-        };
-      })
-      .filter((p: any) => p.distanceKm <= radiusKm)
-      .sort((a: any, b: any) => a.distanceKm - b.distanceKm)
-      .slice(0, 20);
-
+    const raw = await fetchPharmacies(lat, lng, radiusKm);
+    const results = parseResults(raw, lat, lng, radiusKm);
+    process.stderr.write(`[pharmacy] returning ${results.length} results\n`);
     res.json(results);
   } catch (err: any) {
-    process.stderr.write(`[pharmacy] CATCH (fetch): ${err?.message || err}\n`);
-    // Fallback: spawn a plain `node` process to run a standalone script that performs the same fetch.
-    try {
-      const scriptPath = path.join(process.cwd(), "server", "standalone-pharmacy.cjs");
-      process.stderr.write(`[pharmacy] attempting child_process fallback using: ${scriptPath}\n`);
-
-      const child = spawn(process.execPath, [scriptPath, String(lat), String(lng), String(radiusKm)], {
-        cwd: process.cwd(),
-        env: process.env,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-
-      let stdout = "";
-      let stderr = "";
-      const timeout = setTimeout(() => {
-        try {
-          child.kill();
-        } catch (e) {
-          /* ignore */
-        }
-      }, 10_000);
-
-      child.stdout.on("data", (chunk) => (stdout += chunk.toString()));
-      child.stderr.on("data", (chunk) => (stderr += chunk.toString()));
-
-      child.on("close", (code) => {
-        clearTimeout(timeout);
-        if (code === 0 && stdout) {
-          try {
-            const pharmacies = JSON.parse(stdout);
-            process.stderr.write(`[pharmacy] child fallback got ${pharmacies.length} results\n`);
-            const seen = new Set<string>();
-            const results = pharmacies
-              .filter((el: any) => {
-                if (!el.lat || !el.lon) return false;
-                const key = el.lat + "," + el.lon;
-                if (seen.has(key)) return false;
-                seen.add(key);
-                return true;
-              })
-              .map((el: any) => {
-                const elLat = parseFloat(el.lat);
-                const elLng = parseFloat(el.lon);
-                const dist = haversineKm(lat, lng, elLat, elLng);
-                const isPharmacy = el.type === "pharmacy" || el.class === "pharmacy";
-                return {
-                  id: String(el.osm_id),
-                  name: el.name || "Unknown",
-                  type: isPharmacy ? "pharmacy" : "clinic",
-                  distance: formatDistance(dist),
-                  distanceKm: dist,
-                  address: el.display_name || "Address not available",
-                  lat: elLat,
-                  lng: elLng,
-                  phone: "",
-                  isOpen: true,
-                };
-              })
-              .filter((p: any) => p.distanceKm <= radiusKm)
-              .sort((a: any, b: any) => a.distanceKm - b.distanceKm)
-              .slice(0, 20);
-
-            return res.json(results);
-          } catch (parseErr) {
-            process.stderr.write(`[pharmacy] child stdout parse error: ${parseErr} stdout: ${stdout} stderr: ${stderr}\n`);
-            return res.status(502).json({ error: "Failed to fetch pharmacy data", detail: stderr || parseErr.message });
-          }
-        }
-
-        process.stderr.write(`[pharmacy] child process failed code: ${code} stderr: ${stderr}\n`);
-        return res.status(502).json({ error: "Failed to fetch pharmacy data", detail: stderr || "child process failed" });
-      });
-    } catch (childErr: any) {
-      process.stderr.write(`[pharmacy] fallback failed: ${childErr?.message || childErr}\n`);
-      res.status(502).json({ error: "Failed to fetch pharmacy data", detail: childErr?.message || String(childErr) });
-    }
+    process.stderr.write(`[pharmacy] error: ${err.message}\n`);
+    res.status(502).json({ error: "Failed to fetch pharmacy data", detail: err.message });
   }
 });
 
