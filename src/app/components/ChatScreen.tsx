@@ -389,16 +389,6 @@ export function ChatScreen({ initialSymptom, darkMode, onNavigateToPharmacy }: C
         </div>
       </div>
 
-      {/* Speak to Pharmacist */}
-      <div className={`px-4 lg:px-6 pb-2 pt-1 ${darkMode ? "bg-[#09090b]" : "bg-[#fafafa]"}`}>
-        <div className="max-w-2xl mx-auto">
-          <button className={`w-full py-2 rounded-lg flex items-center justify-center gap-2 text-xs font-medium border ${darkMode ? "bg-gray-900 text-gray-400 border-gray-800" : "bg-white text-gray-500 border-gray-200"}`}>
-            <Phone className="w-3.5 h-3.5" />
-            Speak to Human Pharmacist
-          </button>
-        </div>
-      </div>
-
       {/* Input */}
       <div className={`px-4 lg:px-6 pb-4 pt-2 border-t flex-shrink-0 ${darkMode ? "bg-[#09090b] border-gray-800" : "bg-white border-gray-200"}`}>
         <div className="max-w-2xl mx-auto flex items-end gap-2">
