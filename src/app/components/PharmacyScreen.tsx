@@ -185,13 +185,15 @@ interface PharmacyScreenProps {
 }
 
 export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
-  const [activeTab, setActiveTab] = useState<"otc" | "prescription">("otc");
+  const [activeTab] = useState<"prescription">("prescription");
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [userPos, setUserPos] = useState<[number, number] | null>(null);
   const [radiusKm, setRadiusKm] = useState(10);
   const [addressName, setAddressName] = useState("Detecting your location...");
+
+  const theme = (light: string, dark: string) => (darkMode ? dark : light);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,22 +220,39 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
         const data = await api.pharmacy.nearby(latitude, longitude, radiusKm);
 
         if (cancelled) return;
-        const mapped: Pharmacy[] = data.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          type: p.type,
-          distance: p.distance,
-          address: p.address,
-          isOpen: p.isOpen,
-          closingTime: "N/A",
-          rating: 0,
-          services: [],
-          phone: p.phone,
-          otcAvailable: p.type === "pharmacy",
-          prescriptionAvailable: true,
-          lat: p.lat,
-          lng: p.lng,
-        }));
+        const mapped: Pharmacy[] = data.map((p: any) => {
+          const nameRaw = p.name || "";
+          const name = nameRaw.toLowerCase();
+          const address = (p.address || "").toLowerCase();
+          const hasOpening = Boolean(p.extratags && (p.extratags.opening_hours || p.extratags.open_hours));
+          const isPharmacyType = p.type === "pharmacy" || /pharmacy|chemist|drugstore|apotek|apoteket|pharmacie/i.test(name + " " + address);
+          const isClinicName = /clinic|hospital|medical|health center|healthcentre|nhs|medical center|medical centre|surgery/i.test(name + " " + address);
+
+          // Determine display type: prefer clinic/hospital detection from name/address, otherwise use server-provided type
+          const displayType: "pharmacy" | "clinic" = isClinicName && !isPharmacyType ? "clinic" : isPharmacyType ? "pharmacy" : (isClinicName ? "clinic" : (p.type === "clinic" || p.type === "hospital" ? "clinic" : "pharmacy"));
+
+          // OTC: retail pharmacies (named as pharmacy/chemist/drugstore) and likely have opening hours
+          const otcAvailable = isPharmacyType && (hasOpening || /pharmacy|chemist|drugstore|boots|cvs|walgreens|apotek/i.test(name));
+          // Prescription: clinics/hospitals or pharmacies that appear to dispense (pharmacy type)
+          const prescriptionAvailable = displayType === "clinic" || isPharmacyType;
+
+          return {
+            id: p.id,
+            name: p.name,
+            type: displayType,
+            distance: p.distance,
+            address: p.address,
+            isOpen: p.isOpen,
+            closingTime: "N/A",
+            rating: 0,
+            services: [],
+            phone: p.phone,
+            otcAvailable,
+            prescriptionAvailable,
+            lat: p.lat,
+            lng: p.lng,
+          };
+        });
         setPharmacies(mapped);
       } catch {
         if (!cancelled) {
@@ -249,16 +268,16 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
     return () => { cancelled = true; };
   }, [radiusKm]);
 
-  const filtered = pharmacies.filter((p) => activeTab === "otc" ? p.otcAvailable : p.prescriptionAvailable);
+  const filtered = pharmacies.filter((p) => p.prescriptionAvailable);
 
   return (
-    <div className={`${darkMode ? "bg-gray-950" : "bg-gray-50"}`}>
+    <div className={theme("bg-gray-50", "bg-gray-950")}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
 
         {/* Page header */}
         <div className="mb-4">
-          <h2 className={`${darkMode ? "text-white" : "text-gray-900"}`} style={{ fontSize: "24px", fontWeight: 700 }}>Find Nearby</h2>
-          <p className={`flex items-center gap-1.5 mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`} style={{ fontSize: "13px" }}>
+          <h2 className={theme("text-gray-900", "text-white")} style={{ fontSize: "24px", fontWeight: 700 }}>Find Nearby</h2>
+          <p className={`flex items-center gap-1.5 mt-1 ${theme("text-gray-500", "text-gray-400")}`} style={{ fontSize: "13px" }}>
             <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
             <span className="truncate">{addressName}</span>
           </p>
@@ -283,7 +302,7 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
               {r} km
             </button>
           ))}
-          <span className={`ml-auto text-xs ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+          <span className={`ml-auto text-xs ${theme("text-gray-400", "text-gray-500")}`}>
             {loading ? "Searching..." : `${pharmacies.length} found`}
           </span>
         </div>
@@ -302,7 +321,7 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
             </button>
 
             {/* Legend */}
-            <div className={`rounded-2xl p-4 ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-100 shadow-sm"}`}>
+            <div className={`rounded-2xl p-4 ${theme("bg-white border border-gray-100 shadow-sm", "bg-gray-800 border border-gray-700")}`}>
               <p className={`mb-3 ${darkMode ? "text-gray-300" : "text-gray-700"}`} style={{ fontSize: "13px", fontWeight: 600 }}>Map Legend</p>
               <div className="space-y-2">
                 {[
@@ -326,16 +345,12 @@ export function PharmacyScreen({ darkMode }: PharmacyScreenProps) {
           {/* Right: list */}
           <div className="lg:col-span-3 space-y-4">
             {/* Tabs */}
-            <div className={`flex rounded-xl p-1 ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}>
-              {[{ key: "otc", label: "Over-the-Counter" }, { key: "prescription", label: "Get Prescription" }].map((tab) => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key as "otc" | "prescription")}
-                  className={`flex-1 py-2.5 rounded-lg transition-all min-h-[44px] ${
-                    activeTab === tab.key ? darkMode ? "bg-blue-600 text-white shadow" : "bg-white text-blue-600 shadow" : darkMode ? "text-gray-400" : "text-gray-500"
-                  }`}
-                  style={{ fontSize: "13px", fontWeight: 600 }}>
-                  {tab.label}
-                </button>
-              ))}
+            <div className={`flex rounded-xl p-1 ${theme("bg-gray-100", "bg-gray-800")}`}>
+              <div className="flex-1">
+                <div className={`py-2.5 rounded-lg text-center ${theme("bg-white text-blue-600 shadow", "bg-blue-600 text-white shadow")}`} style={{ fontSize: "13px", fontWeight: 600 }}>
+                  Prescription
+                </div>
+              </div>
             </div>
 
             <div className="space-y-3">
