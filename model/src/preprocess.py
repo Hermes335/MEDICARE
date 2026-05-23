@@ -274,6 +274,31 @@ def translate_taglish_symptoms(text: str) -> str:
     for taglish, english in _TAGLISH_SYMPTOM_MAP.items():
         if taglish in text_lower:
             text = text.replace(taglish, english, 1)
+    # Normalize common English symptom synonyms (e.g., 'ache' -> 'pain')
+    return _normalize_english_symptoms(text)
+
+
+_EN_SYMPTOM_SYNONYMS = {
+    "ache": "pain",
+    "stomach ache": "stomach pain",
+    "belly ache": "stomach pain",
+    "tummy ache": "stomach pain",
+    "sore throat": "sore throat",
+}
+
+
+def _normalize_english_symptoms(text: str) -> str:
+    """Normalize simple English symptom synonyms to improve BM25 matches.
+
+    This maps common variants like 'ache' -> 'pain' so queries such as
+    'stomach ache' match records that use 'stomach pain'. Kept intentionally
+    small and deterministic to avoid over-mapping user input.
+    """
+    text_lower = text.lower()
+    for src, dst in _EN_SYMPTOM_SYNONYMS.items():
+        if src in text_lower:
+            text = re.sub(re.escape(src), dst, text, flags=re.IGNORECASE)
+            text_lower = text.lower()
     return text
 
 

@@ -34,10 +34,18 @@ from src.inference import chat, chat_full
 app = Flask(__name__)
 CORS(app)
 
+API_VERSION = "1.1.0"
+MODEL_VERSION = "improved-training"
+BASE_MODEL = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+ADAPTER_PATH = "models/pharmacare_lora"
+
 model_state = {
     "loading": True,
     "ready": False,
     "error": None,
+    "model_version": MODEL_VERSION,
+    "base_model": BASE_MODEL,
+    "adapter_path": ADAPTER_PATH,
 }
 
 
@@ -81,10 +89,12 @@ def health():
 def info():
     return jsonify({
         "app": "Pharmacare",
-        "version": "1.0.0",
-        "base_model": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-        "adapter_path": "models/pharmacare_lora",
+        "version": API_VERSION,
+        "model_version": MODEL_VERSION,
+        "base_model": BASE_MODEL,
+        "adapter_path": ADAPTER_PATH,
         "quantization": "4-bit NF4",
+        "training_update": "Updated LoRA adapter with improved training for cleaner, safer, and more grounded responses.",
         "languages": ["en", "tl"],
         "safety_features": [
             "Emergency keyword bypass",
@@ -122,6 +132,7 @@ def chat_endpoint():
             "rx_flag": result.get("rx_flag", False),
             "emergency": result.get("emergency", False),
             "language": result.get("language", "en"),
+            "model_version": MODEL_VERSION,
             "latency_seconds": round(latency, 3),
         })
     except Exception as e:
