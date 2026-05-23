@@ -110,6 +110,7 @@ _TAGLISH_SYMPTOM_MAP = {
     "stomach aches": "stomach pain",
     "stomach cramp": "stomach pain",
     "stomach cramps": "stomach pain",
+    "stomach sakit": "stomach pain",
     "tummy ache": "stomach pain",
     "tummy pain": "stomach pain",
     "belly pain": "stomach pain",

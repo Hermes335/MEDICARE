@@ -125,6 +125,21 @@ function MedicineCardComponent({ med, darkMode, saved, onSave, onFindPharmacy, r
       </div>
 
       <div className="p-4 space-y-4">
+        {/* Controlled substance banner (prominent) */}
+        {med.warnings.some((w) => /RA\s*9165|controlled/i.test(w)) && (
+          <div className={`p-3 mb-2 rounded-lg flex items-start gap-3 ${darkMode ? "bg-red-900/20 border border-red-800 text-red-100" : "bg-red-50 border border-red-200 text-red-800"}`}>
+            <AlertTriangle className={`w-5 h-5 flex-shrink-0 ${darkMode ? "text-red-400" : "text-red-600"}`} />
+            <div>
+              <div className={`font-semibold ${darkMode ? "text-red-100" : "text-red-800"}`}>⚠️ CONTROLLED SUBSTANCE (RA 9165)</div>
+              <div className={`text-xs mt-1 ${darkMode ? "text-red-300" : "text-red-700"}`}>
+                {med.language === "tl"
+                  ? "Ang gamot na ito ay klasipikadong dangerous drug sa ilalim ng Republic Act 9165. Kinakailangan ng reseta at mahigpit na regulasyon."
+                  : "This medicine is classified as a controlled substance under Republic Act 9165. It requires a valid prescription and strict regulatory compliance."}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Rx Warning */}
         {med.rxWarning && (
           <div className={`p-2.5 rounded-lg flex items-start gap-2 text-xs ${darkMode ? "bg-orange-950/30 border border-orange-900/50 text-orange-300" : "bg-orange-50 border border-orange-200 text-orange-700"}`}>
@@ -250,9 +265,14 @@ function MedicineCardComponent({ med, darkMode, saved, onSave, onFindPharmacy, r
                           {med.language === "tl" ? "Mga Babala" : "Warnings"}
                         </p>
                         <div className="flex flex-wrap gap-1">
-                          {med.warnings.map((w) => (
-                            <span key={w} className={`px-2 py-0.5 rounded text-[10px] font-medium ${darkMode ? "bg-red-950 text-red-400 border border-red-900" : "bg-red-50 text-red-600 border border-red-100"}`}>{w}</span>
-                          ))}
+                          {med.warnings.map((w) => {
+                            const isControlled = /RA\s*9165|controlled/i.test(w);
+                            return (
+                              <span key={w} className={`px-2 py-0.5 rounded text-[10px] font-medium ${isControlled ? (darkMode ? "bg-red-800 text-red-100 border border-red-700" : "bg-red-100 text-red-800 border border-red-200") : (darkMode ? "bg-red-950 text-red-400 border border-red-900" : "bg-red-50 text-red-600 border border-red-100")}`}>
+                                {w}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
